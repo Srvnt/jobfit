@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { cosineSimilarity, matchRequirements, summarize } from "./match";
-import { fakeEmbedder } from "./testing";
+import { CV_SOURCE, cvStatements, fakeEmbedder, portfolioStatements } from "./testing";
 import type { RequirementMatch } from "./types";
 
 describe("cosineSimilarity", () => {
@@ -19,11 +19,11 @@ describe("cosineSimilarity", () => {
 });
 
 describe("matchRequirements", () => {
-  const cv = [
+  const cv = cvStatements([
     "Built ETL data pipelines in Python and Airflow",
     "Led a team of four engineers",
     "Designed REST APIs in Node",
-  ];
+  ]);
 
   it("links each requirement to the CV lines that support it, best first", async () => {
     const [match] = await matchRequirements(["Experience building data pipelines in Python"], cv, fakeEmbedder());
@@ -99,8 +99,44 @@ describe("matchRequirements", () => {
     expect(await matchRequirements([], cv, fakeEmbedder())).toEqual([]);
     const matches = await matchRequirements(["Experience with Python data pipelines"], [], fakeEmbedder());
     expect(matches).toEqual([
-      { requirement: "Experience with Python data pipelines", status: "gap", score: 0, evidence: [], missingTerms: ["Python"] },
+      {
+        requirement: "Experience with Python data pipelines",
+        status: "gap",
+        score: 0,
+        evidence: [],
+        missingTerms: ["Python"],
+        onlyOutsideCv: false,
+      },
     ]);
+  });
+});
+
+describe("matchRequirements with several evidence sources", () => {
+  const cv = cvStatements(["Built ETL data pipelines in Python and Airflow"]);
+  const portfolio = portfolioStatements(["Migrated our services to Kubernetes clusters on GCP"]);
+
+  it("carries each statement's source onto its evidence", async () => {
+    const [match] = await matchRequirements(["Migrated services to Kubernetes clusters"], [...cv, ...portfolio], fakeEmbedder(), {
+      partialThreshold: 0.3,
+    });
+    expect(match.evidence[0].source).toEqual({ kind: "portfolio", label: "Portfolio: /projects/x", url: "https://alex.example/projects/x" });
+  });
+
+  it("flags a requirement that only evidence outside the CV supports", async () => {
+    const [k8s, etl] = await matchRequirements(
+      ["Migrated services to Kubernetes clusters", "Built ETL data pipelines in Python"],
+      [...cv, ...portfolio],
+      fakeEmbedder(),
+      { partialThreshold: 0.3 },
+    );
+    expect(k8s.onlyOutsideCv).toBe(true);
+    expect(etl.onlyOutsideCv).toBe(false);
+    expect(etl.evidence[0].source).toEqual(CV_SOURCE);
+  });
+
+  it("looks for named terms in every source, not just the CV", async () => {
+    const [match] = await matchRequirements(["Hands-on Kubernetes experience"], [...cv, ...portfolio], fakeEmbedder());
+    expect(match.missingTerms).toEqual([]);
   });
 });
 
@@ -111,6 +147,7 @@ describe("summarize", () => {
     score: 0,
     evidence: [],
     missingTerms: [],
+    onlyOutsideCv: false,
   });
 
   it("scores met as 1, partial as 0.5 and gap as 0, as a rounded percentage", () => {

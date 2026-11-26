@@ -1,5 +1,5 @@
 import { missingTerms } from "./terms";
-import type { Embedder, MatchOptions, MatchStatus, RequirementMatch, Summary } from "./types";
+import type { Embedder, MatchOptions, MatchStatus, RequirementMatch, Statement, Summary } from "./types";
 
 /**
  * Defaults tuned for bge-small-en-v1.5 on the evaluation set: real evidence typically
@@ -24,10 +24,10 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   return na === 0 || nb === 0 ? 0 : dot / Math.sqrt(na * nb);
 }
 
-/** Matches every requirement against every CV statement and classifies the result. */
+/** Matches every requirement against every statement (from the CV or elsewhere) and classifies the result. */
 export async function matchRequirements(
   requirements: string[],
-  cvStatements: string[],
+  statements: Statement[],
   embedder: Embedder,
   options: MatchOptions = {},
 ): Promise<RequirementMatch[]> {
@@ -35,20 +35,22 @@ export async function matchRequirements(
   if (requirements.length === 0) return [];
 
   const reqVectors = await embedder.embed(requirements, "query");
-  const cvVectors = cvStatements.length ? await embedder.embed(cvStatements, "passage") : [];
+  const texts = statements.map((s) => s.text);
+  const statementVectors = texts.length ? await embedder.embed(texts, "passage") : [];
 
   return requirements.map((requirement, i) => {
-    const ranked = cvStatements
-      .map((text, j) => ({ text, score: cosineSimilarity(reqVectors[i], cvVectors[j]) }))
+    const ranked = statements
+      .map((s, j) => ({ ...s, score: cosineSimilarity(reqVectors[i], statementVectors[j]) }))
       .sort((a, b) => b.score - a.score);
     const score = ranked[0]?.score ?? 0;
-    const missing = missingTerms(requirement, cvStatements);
+    const missing = missingTerms(requirement, texts);
     let status: MatchStatus = score >= metThreshold ? "met" : score >= partialThreshold ? "partial" : "gap";
     // Embeddings blur named skills together ("Swedish" ≈ "English"), so a named skill the CV
     // never mentions costs one level, however similar the wording.
     if (missing.length > 0) status = status === "met" ? "partial" : "gap";
     const evidence = status === "gap" ? [] : ranked.filter((e) => e.score >= partialThreshold).slice(0, topK);
-    return { requirement, status, score, evidence, missingTerms: missing };
+    const onlyOutsideCv = evidence.length > 0 && evidence.every((e) => e.source.kind !== "cv");
+    return { requirement, status, score, evidence, missingTerms: missing, onlyOutsideCv };
   });
 }
 

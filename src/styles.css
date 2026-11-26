@@ -138,5 +138,23 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
 .bar span { display: block; height: 100%; background: var(--accent); }
 .score { font-variant-numeric: tabular-nums; color: var(--muted); }
+.evidence li.with-source { grid-template-columns: 64px 36px 1fr auto; }
+.source {
+  justify-self: end;
+  padding: 1px 8px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  text-decoration: none;
+}
+a.source:hover { color: var(--accent); border-color: var(--accent); }
+.source.portfolio { color: var(--accent); }
+.hint { color: var(--accent); }
+@media (max-width: 560px) {
+  .evidence li.with-source { grid-template-columns: 64px 36px 1fr; }
+  .evidence li.with-source .source { grid-column: 3; justify-self: start; }
+}
 
 footer { margin-top: 40px; font-size: 0.8rem; }

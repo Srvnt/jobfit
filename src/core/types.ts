@@ -11,9 +11,21 @@ export interface Embedder {
 
 export type MatchStatus = "met" | "partial" | "gap";
 
-export interface Evidence {
-  /** The CV statement that supports the requirement. */
+/** Where a statement came from, shown next to it as evidence. */
+export interface EvidenceSource {
+  kind: "cv" | "portfolio";
+  /** Short human label, e.g. "CV" or "Portfolio: /projects/jobfit". */
+  label: string;
+  url?: string;
+}
+
+/** One self-contained claim about the candidate, from the CV or another source. */
+export interface Statement {
   text: string;
+  source: EvidenceSource;
+}
+
+export interface Evidence extends Statement {
   /** Cosine similarity between the requirement and this statement. */
   score: number;
 }
@@ -21,12 +33,14 @@ export interface Evidence {
 export interface RequirementMatch {
   requirement: string;
   status: MatchStatus;
-  /** Similarity of the best-matching CV statement (0 when the CV is empty). */
+  /** Similarity of the best-matching statement (0 when there are none). */
   score: number;
-  /** Supporting CV statements, best first; empty for a gap. */
+  /** Supporting statements, best first; empty for a gap. */
   evidence: Evidence[];
-  /** Named terms in the requirement (e.g. "Kubernetes") that the CV never mentions. */
+  /** Named terms in the requirement (e.g. "Kubernetes") that no source mentions. */
   missingTerms: string[];
+  /** Supported, but only by sources other than the CV: worth adding to the CV. */
+  onlyOutsideCv: boolean;
 }
 
 export interface MatchOptions {

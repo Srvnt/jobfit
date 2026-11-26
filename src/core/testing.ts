@@ -1,4 +1,13 @@
-import type { Embedder, EmbedKind } from "./types";
+import type { Embedder, EmbedKind, Statement } from "./types";
+
+export const CV_SOURCE = { kind: "cv", label: "CV" } as const;
+
+/** Wraps plain strings as CV statements. */
+export const cvStatements = (texts: string[]): Statement[] => texts.map((text) => ({ text, source: CV_SOURCE }));
+
+/** Wraps plain strings as statements from one portfolio page. */
+export const portfolioStatements = (texts: string[], url = "https://alex.example/projects/x"): Statement[] =>
+  texts.map((text) => ({ text, source: { kind: "portfolio", label: "Portfolio: /projects/x", url } }));
 
 /**
  * Deterministic stand-in for a real embedding model, used in tests:

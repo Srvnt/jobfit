@@ -2,7 +2,9 @@
 
 Paste a job ad and a CV, or upload the CV as a Word (.docx) or PDF file. JobFit matches every requirement to the CV lines that back it up, by meaning rather than keywords, and flags what's missing.
 
-**Everything runs in the browser.** The embedding model is downloaded once (~34 MB, then cached) and runs on the visitor's device in a Web Worker. No server, no API key, no data leaves the device.
+**The AI runs in the browser.** The embedding model is downloaded once (~34 MB, then cached) and runs on the visitor's device in a Web Worker. No API key, and the CV never leaves the device.
+
+The only server part is a small page fetcher ([api/fetch-page.ts](api/fetch-page.ts)) for reading a job ad or portfolio from a link, because browsers can't read other sites' pages directly (CORS). Only those public addresses pass through it.
 
 ## How it works
 
@@ -18,6 +20,24 @@ CV ──────► segment ──────────────┘  
 2. **Embedding** ([src/embedder/](src/embedder/)): `bge-small-en-v1.5`, quantised, via Transformers.js. Requirements are embedded as search *queries*, CV lines as *passages*.
 3. **Matching** ([src/core/match.ts](src/core/match.ts)): each requirement's best CV line decides its status (met ≥ 0.65, partial ≥ 0.5, otherwise a gap).
 4. **Named-term check** ([src/core/terms.ts](src/core/terms.ts)): if a requirement names a specific skill (Swedish, Kubernetes, SQL…) that the CV never mentions, its status drops one level.
+
+## Page fetcher (`POST /api/fetch-page`)
+
+```json
+{ "url": "https://alex.example/", "mode": "portfolio" }   →   { "pages": [{ "url", "title", "text" }] }
+```
+
+`job` mode reads one page. `portfolio` mode reads the start page plus up to four same-site pages, project-like paths first. Pages are reduced to text by [src/web/page.ts](src/web/page.ts), which drops navigation, footers, scripts and cookie banners.
+
+A server that fetches user-supplied URLs is a classic SSRF risk, so [src/web/safeUrl.ts](src/web/safeUrl.ts) and [src/web/fetchPage.ts](src/web/fetchPage.ts):
+
+- only allow http(s) on default ports, with no credentials in the URL
+- refuse localhost, single-label and `.local`/`.internal` names, and private, loopback, link-local (cloud metadata), CGNAT and other reserved IP ranges, including IPv4-mapped IPv6
+- check the DNS answer **at connect time** (an undici dispatcher with a guarded `lookup`), which also covers redirects and DNS rebinding. For example, `localtest.me` resolves to 127.0.0.1 and is refused.
+- follow at most 3 redirects, re-checking each one, with an 8 s timeout, a 2 MB size limit and HTML-only content types
+- return user-facing messages only, never internal error details
+
+During `npm run dev`, a small Vite middleware serves the same function, so no Vercel login is needed locally.
 
 ## Why the named-term check exists
 
@@ -38,7 +58,7 @@ bge-small separates real matches much better, so it became the model. The langua
 npm install
 npm test        # unit tests (Vitest), using a fake embedder: fast, no model download
 npm run dev     # http://localhost:5173
-npm run build   # static site in dist/, deployable to GitHub Pages / Vercel / Netlify
+npm run build   # static site in dist/ plus api/ functions, deployed on Vercel
 ```
 
 The core logic was written test-first. Its tests use a deterministic bag-of-words embedder ([src/core/testing.ts](src/core/testing.ts)), so they run in milliseconds and don't depend on a model.
@@ -50,10 +70,14 @@ The core logic was written test-first. Its tests use a deterministic bag-of-word
 - Similarity is not proof: the report shows its evidence so a human can judge.
 - Scanned PDFs (images with no text layer) can't be read. The app says so and suggests exporting from Word or Google Docs instead. Old `.doc` files need saving as `.docx` first.
 - Two-column CV layouts may come out with columns interleaved, so the extracted text is shown for checking before analysis.
+- The page fetcher can't read sites that only render with JavaScript, or that need a login (e.g. LinkedIn). It says so, and the text can be pasted instead.
+- Finnish job ads: "what we offer" sections aren't recognised yet (the heading keywords are English, and question-style headings like "Mitä tarjoamme sinulle?" aren't treated as headings).
 
 ## Roadmap
 
 - [ ] Evaluation set with precision and recall per status, run in CI
-- [ ] Job ad from a link (needs a small serverless fetch function because of CORS)
+- [x] Page fetcher for job ads and portfolios (server side)
+- [ ] Link inputs for the job ad and portfolio in the UI, with source tags on evidence
+- [ ] Finnish section headings in job ads
 - [ ] Layer 2: in-browser LLM (WebLLM) for a cover-letter draft built only from the matched evidence
 - [ ] Deploy to GitHub Pages
