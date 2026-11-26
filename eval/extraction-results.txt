@@ -1,6 +1,6 @@
 
-=== requirement extraction (5 labelled ads, Xenova/paraphrase-multilingual-MiniLM-L12-v2) ===
-headings only                        precision 69%  recall 100%  (22/32 kept, 22 expected)
+=== requirement extraction (6 labelled ads, Xenova/paraphrase-multilingual-MiniLM-L12-v2) ===
+headings only                        precision 59%  recall 100%  (26/44 kept, 26 expected)
     kept: brightline is a fast-growing fintech company in espoo.
     kept: we are looking for a frontend developer to join our payments team.
     kept: you will work closely with our design team and ship features weekly.
@@ -11,21 +11,24 @@ headings only                        precision 69%  recall 100%  (22/32 kept, 22
     kept: tarjoamme kilpailukykyisen palkan ja hyvät työsuhde-edut.
     kept: lisätietoja tehtävästä antaa rekrytointipäällikkö.
     kept: hae viimeistään 20.12.
-AI filter only (margin -0.05)        precision 81%  recall 100%  (22/27 kept, 22 expected)
-AI filter only (margin 0)            precision 83%  recall 91%  (20/24 kept, 22 expected)
+    kept: etsimme fullstack-kehittäjää asiakasprojekteihimme.
+    kept: pääset suunnittelemaan ja toteuttamaan palveluita yhdessä asiakkaan kanssa.
+AI filter only (margin -0.05)        precision 81%  recall 100%  (26/32 kept, 26 expected)
+AI filter only (margin 0)            precision 83%  recall 96%  (25/30 kept, 26 expected)
     kept: northwind builds route planning software for logistics companies.
-    missed: knowledge of the logistics industry
     missed: experience with design systems is a plus.
     kept: liikunta- ja kulttuurietu
+    kept: osallistut testaukseen ja koodikatselmointeihin.
     kept: the role requires c#, javascript and good sql skills.
     kept: maintain quotation systems and sql databases
-AI filter only (margin 0.05)         precision 85%  recall 77%  (17/20 kept, 22 expected)
-headings + AI filter (margin -0.05)  precision 100%  recall 100%  (22/22 kept, 22 expected)
-headings + AI filter (margin 0)      precision 100%  recall 91%  (20/20 kept, 22 expected)
-    missed: knowledge of the logistics industry
+AI filter only (margin 0.05)         precision 87%  recall 77%  (20/23 kept, 26 expected)
+headings + AI filter (margin -0.05)  precision 96%  recall 100%  (26/27 kept, 26 expected)
+headings + AI filter (margin 0)      precision 96%  recall 96%  (25/26 kept, 26 expected)
     missed: experience with design systems is a plus.
-headings + AI filter (margin 0.05)   precision 100%  recall 77%  (17/17 kept, 22 expected)
-headings, AI filter without them (app) (margin -0.05) precision 100%  recall 100%  (22/22 kept, 22 expected)
-headings, AI filter without them (app) (margin 0) precision 100%  recall 95%  (21/21 kept, 22 expected)
+    kept: osallistut testaukseen ja koodikatselmointeihin.
+headings + AI filter (margin 0.05)   precision 95%  recall 77%  (20/21 kept, 26 expected)
+headings, AI filter without them (app) (margin -0.05) precision 96%  recall 100%  (26/27 kept, 26 expected)
+headings, AI filter without them (app) (margin 0) precision 96%  recall 96%  (25/26 kept, 26 expected)
     missed: experience with design systems is a plus.
-headings, AI filter without them (app) (margin 0.05) precision 100%  recall 86%  (19/19 kept, 22 expected)
+    kept: osallistut testaukseen ja koodikatselmointeihin.
+headings, AI filter without them (app) (margin 0.05) precision 96%  recall 88%  (23/24 kept, 26 expected)

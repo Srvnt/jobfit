@@ -81,6 +81,24 @@ export const ADS: { name: string; lines: AdLine[] }[] = [
     ],
   },
   {
+    name: "Finnish, no headings, lots of company culture",
+    lines: [
+      ["Haluatko rakentaa palveluita, joita tuhannet ihmiset käyttävät päivittäin?", false],
+      ["Etsimme fullstack-kehittäjää asiakasprojekteihimme.", false],
+      ["Pääset suunnittelemaan ja toteuttamaan palveluita yhdessä asiakkaan kanssa.", false],
+      ["Osallistut testaukseen ja koodikatselmointeihin.", false],
+      ["Sinulla on vahvaa kokemusta TypeScriptistä ja Reactista.", true],
+      ["Tunnet pilviympäristöt, mielellään Azuren.", true],
+      ["Osaat kirjoittaa testattavaa koodia.", true],
+      ["Puhut ja kirjoitat sujuvasti suomea ja englantia.", true],
+      ["Meillä on rento ja yhteisöllinen työilmapiiri.", false],
+      ["Työkaverit ovat meille kuin perhettä, ja vietämme aikaa myös töiden ulkopuolella.", false],
+      ["Haluamme olla työpaikka, jossa viihdyt vuodesta toiseen.", false],
+      ["Tehtävässä työskennellään hybridimallilla.", false],
+      ["Voit lähettää hakemuksesi alla olevan lomakkeen kautta.", false],
+    ],
+  },
+  {
     name: "Aggregator style (summary, tasks, other information)",
     lines: [
       ["Summary of the job ad:", false],

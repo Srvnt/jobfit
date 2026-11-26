@@ -52,6 +52,9 @@ export const OTHER_EXAMPLES = [
   "Hae paikkaa viimeistään 15.12. hakulomakkeella",
   "Työtehtäviisi kuuluu järjestelmien kehittäminen ja ylläpito",
   "Työsuhde on vakituinen ja kokoaikainen",
+  "Meillä on rento ja yhteisöllinen työilmapiiri",
+  "Työkaverit ovat mukavia ja järjestämme yhteisiä tapahtumia",
+  "Tehtävässä työskennellään hybridimallilla pääkaupunkiseudulla",
 ];
 
 export interface LineFilterOptions {

@@ -18,11 +18,11 @@ const ABBREVIATIONS = new Set([
 
 /** Job ad section headings whose content is not a requirement (English and Finnish). */
 const NON_REQUIREMENT_HEADING =
-  /\b(about (us|the company)|who (we are|are we)|we offer|what we offer|benefits|perks|how to apply|contact|salary|compensation|(other|more|additional) information|practical (details|information)|recruitment|start date|location|employment (period|type))\b|tarjoamme|keitä olemme|keitä me olemme|meistä|yrityksestä|hakeminen|hakuprosessi|näin haet|palkka|\bedut\b|työsuhde-edut|yhteystied|lisätiedot|lisätietoa|rekrytointi|aloitus|sijainti/i;
+  /\b(about (us|the company)|who (we are|are we)|we offer|what we offer|benefits|perks|how to apply|contact|salary|compensation|(other|more|additional) information|practical (details|information)|recruitment|start date|location|employment (period|type))\b|tarjoamme|keitä olemme|keitä me olemme|meistä|yrityksestä|hakeminen|hakuprosessi|näin haet|palkka|\bedut\b|työsuhde-edut|yhteystied|lisätiedot|lisätietoa|rekrytointi|aloitus|sijainti|mitä pääset tekemään|työtehtävä|tehtäväsi|^työskentely|^miksi\b|mitä tarkoittaa olla|^hae\b|^(what you('ll)? do|your role|responsibilities|why (join|us)|apply now)\b/i;
 
 /** Job ad section headings that introduce requirements (English and Finnish). */
 const REQUIREMENT_HEADING =
-  /require|qualification|searching for|looking for|are you the one|what you('ll)? (bring|have|need)|what we('re| are)? (expect|look(ing)? for)|we expect|you have|you bring|your (profile|skills|background|experience)|^((technical|key|core|required) )?(skills|competenc\w*)\b|must[- ]haves?|nice[- ]to[- ]haves?|advantage|bonus|merit|preferred|vaatimu|odotamme|edellytämme|toivomme|arvostamme|sinulla on|^(osaaminen|osaamisesi|kokemus|kokemuksesi|profiili|pätevyys)( ja \S+)?:?$|eduksi|pätevyy/i;
+  /require|qualification|searching for|looking for|are you the one|what you('ll)? (bring|have|need)|what we('re| are)? (expect|look(ing)? for)|we expect|you have|you bring|your (profile|skills|background|experience)|^((technical|key|core|required) )?(skills|competenc\w*)\b|must[- ]haves?|nice[- ]to[- ]haves?|advantage|bonus|merit|preferred|vaatimu|odotamme|edellytämme|toivomme|arvostamme|sinulla on|sinulta löytyy|plussaa|hyödyksi|meritoivaa|^(osaaminen|osaamisesi|kokemus|kokemuksesi|profiili|pätevyys)( ja \S+)?:?$|eduksi|pätevyy/i;
 
 /** Longer lines that still introduce a requirement list: "It is meritorious if you have". */
 const REQUIREMENT_LEAD_IN = /^(it is (meritorious|a plus|an advantage)|we (also )?(appreciate|value) (it )?if|katsomme eduksi|eduksi katsotaan|arvostamme)/i;

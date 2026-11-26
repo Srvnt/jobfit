@@ -210,6 +210,35 @@ describe("extractRequirements: requirement sections", () => {
     expect(extractRequirements(ad)).toEqual(["Kokemusta Kubernetesista", "Hyvä SQL-osaaminen", "Sujuva englannin kielen taito"]);
   });
 
+  it("recognises Finnish headings like 'Sinulta löytyy', 'Plussaa', 'Mitä pääset tekemään' and 'Miksi meille?'", () => {
+    const ad = [
+      "Haemme kokenutta kehittäjää rakentamaan asiakkaidemme palveluita.",
+      "Mitä pääset tekemään",
+      "Kehität taustajärjestelmiä pilviympäristössä.",
+      "Osallistut koodikatselmointeihin ja testaukseen.",
+      "Sinulta löytyy",
+      "Kokemusta backend-kehityksestä Javalla tai Pythonilla.",
+      "Ymmärrystä CI/CD-putkista ja versionhallinnasta.",
+      "Sujuva suomen ja englannin kielen taito.",
+      "Plussaa",
+      "Kokemus julkisen sektorin hankkeista.",
+      "Työskentely",
+      "Tehtävässä työskennellään hybridimallilla Helsingissä.",
+      "Miksi Acme?",
+      "Meillä on rento työilmapiiri ja hyvät kollegat.",
+      "Mitä tarkoittaa olla acmelainen?",
+      "Se on afterworkeja ja uuden oppimista.",
+      "Hae nyt",
+      "Lähetä hakemuksesi lomakkeen kautta.",
+    ].join("\n");
+    expect(extractRequirements(ad)).toEqual([
+      "Kokemusta backend-kehityksestä Javalla tai Pythonilla.",
+      "Ymmärrystä CI/CD-putkista ja versionhallinnasta.",
+      "Sujuva suomen ja englannin kielen taito.",
+      "Kokemus julkisen sektorin hankkeista.",
+    ]);
+  });
+
   it("doesn't let a short colon heading that names nothing continue a requirement section", () => {
     const ad = "Requirements\n- Five years of backend experience\nPractical details:\n- Office in Tampere city centre";
     expect(extractRequirements(ad)).toEqual(["Five years of backend experience"]);

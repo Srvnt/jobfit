@@ -18,7 +18,7 @@ job ad ──► extractRequirements ──┐                          ┌─�
 CV ──────► segment ──────────────┘                       └─► named-term check ─► report
 ```
 
-1. **Segmentation** ([src/core/segment.ts](src/core/segment.ts)): splits text into bullets and sentences and handles abbreviations. For a job ad, when it has requirement headings ("Qualifications", "Required", "Considered an advantage", "Mitä odotamme sinulta?", "Katsomme eduksi"), only those sections are kept. A prose paragraph after a requirement list ends the section. Without such headings, it drops the clearly non-requirement sections ("About us", "We offer", "Mitä tarjoamme?"…). Short lines inside a requirement section count as list items, because job sites' structured data often drops the bullet markers.
+1. **Segmentation** ([src/core/segment.ts](src/core/segment.ts)): splits text into bullets and sentences and handles abbreviations. For a job ad, when it has requirement headings ("Qualifications", "Required", "Considered an advantage", "Mitä odotamme sinulta?", "Sinulta löytyy", "Plussaa", "Katsomme eduksi"), only those sections are kept. A prose paragraph after a requirement list ends the section. Without such headings, it drops the clearly non-requirement sections ("About us", "We offer", "Mitä tarjoamme?"…). Short lines inside a requirement section count as list items, because job sites' structured data often drops the bullet markers.
    For ads **without** requirement headings (or pasted together with the whole page), an **AI line filter** ([src/core/lineFilter.ts](src/core/lineFilter.ts)) runs the same embedding model as a zero-shot classifier. Each line is compared with example requirements ("Kokemusta Javasta", "Fluent English") and with examples of everything else in an ad ("Tarjoamme joustavat työajat", "Location: Helsinki", "Apply by Friday", "Share this job"). It's kept when it's closer to the requirements. The lines it leaves out are listed under the results, so nothing disappears silently. When an ad has requirement headings, they're trusted and the filter isn't used: on real ads the headings were near-perfect, and the filter removed real requirements there.
 2. **Embedding** ([src/embedder/](src/embedder/)): `paraphrase-multilingual-MiniLM-L12-v2`, quantised, via Transformers.js, in a Web Worker. It was chosen over `bge-small-en-v1.5` and `multilingual-e5-small` by the evaluation below. The model settings live in [model.ts](src/embedder/model.ts), shared by the browser and the evaluation.
 3. **Matching** ([src/core/match.ts](src/core/match.ts)): each requirement's best CV or portfolio line decides its status (met ≥ 0.43, partial ≥ 0.31, otherwise a gap). Every model scores on its own scale, so the thresholds come from the evaluation too.
@@ -85,15 +85,19 @@ The biggest single gain came from checking a requirement's first word: in requir
 
 ### Requirement extraction
 
-[eval/ads.ts](eval/ads.ts) holds 5 labelled ads written in the style of real ones: English and Finnish, with and without headings, and an aggregator-style ad. The results are in [eval/extraction-results.txt](eval/extraction-results.txt):
+[eval/ads.ts](eval/ads.ts) holds 6 labelled ads written in the style of real ones: English and Finnish, with and without headings, one heavy on company culture, and an aggregator-style ad. The results are in [eval/extraction-results.txt](eval/extraction-results.txt):
 
 | Method | Precision | Recall |
 |---|---|---|
-| Heading rules only | 69% | 100% |
+| Heading rules only | 59% | 100% |
 | AI line filter only | 81% | 100% |
-| **Headings, with the AI filter for ads without them** (used) | **100%** | **100%** |
+| **Headings, with the AI filter for ads without them** (used) | **96%** | **100%** |
 
-That 100% is optimistic: the same person wrote the filter's examples and the test ads. On three real ads (Jobly, Remion, Deloitte via Duunitori), the heading rules alone gave clean lists, and applying the filter on top of them dropped 3 real requirements, which is why the filter only runs on ads without headings.
+These numbers are optimistic, because the same person wrote the filter's examples and the test ads. That's also why changes are checked on real ads:
+
+- On four real ads (Jobly, Remion, Deloitte via Duunitori, HiQ), applying the filter on top of good headings dropped 3 real requirements. That's why the filter only runs on ads without headings.
+- HiQ's "Sinulta löytyy" / "Plussaa" headings weren't recognised at first, so the whole ad went through the filter and 21 lines came out. Now it's the 8 real requirements.
+- Adding task examples ("Osallistut testaukseen…") to the filter raised precision to 100% but lost two real requirements, so they were taken out again.
 
 ## Development
 
