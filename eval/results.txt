@@ -1,0 +1,24 @@
+
+=== current defaults (met ≥ 0.65, partial ≥ 0.55) ===
+accuracy 86% (38/44)  ·  English 87%  ·  Finnish 80%  ·  false "met" for a gap: 0
+expected \ got   met  partial  gap
+met                18        1        1
+partial             0        5        2
+gap                 0        2       15
+misses:
+  met     → partial 0.58  Degree in computer science or a related field
+  partial → gap     0.65  Ansible or other infrastructure automation  missing: Ansible
+  partial → gap     0.53  Experience with Jakarta EE or Quarkus  missing: Jakarta, EE, Quarkus
+  gap     → partial 0.71  Fluent Swedish  missing: Swedish
+  gap     → partial 0.57  Training machine learning models
+  met     → gap     0.52  Osaamista Azuren pilvipalveluista
+
+=== best thresholds on this set (beware of overfitting a small set) ===
+  met ≥ 0.65, partial ≥ 0.52: 86%, false met 0
+  met ≥ 0.65, partial ≥ 0.53: 86%, false met 0
+  met ≥ 0.65, partial ≥ 0.54: 86%, false met 0
+  met ≥ 0.65, partial ≥ 0.55: 86%, false met 0
+  met ≥ 0.65, partial ≥ 0.56: 86%, false met 0
+  met ≥ 0.65, partial ≥ 0.57: 86%, false met 0
+  met ≥ 0.65, partial ≥ 0.58: 86%, false met 0
+  met ≥ 0.65, partial ≥ 0.59: 86%, false met 0

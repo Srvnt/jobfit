@@ -20,8 +20,8 @@ CV ──────► segment ──────────────┘  
 
 1. **Segmentation** ([src/core/segment.ts](src/core/segment.ts)): splits text into bullets and sentences and handles abbreviations. For a job ad, when it has requirement headings ("Qualifications", "Required", "Considered an advantage", "Mitä odotamme sinulta?", "Katsomme eduksi"), only those sections are kept. A prose paragraph after a requirement list ends the section. Without such headings, it drops the clearly non-requirement sections ("About us", "We offer", "Mitä tarjoamme?"…). Short lines inside a requirement section count as list items, because job sites' structured data often drops the bullet markers.
 2. **Embedding** ([src/embedder/](src/embedder/)): `bge-small-en-v1.5`, quantised, via Transformers.js. Requirements are embedded as search *queries*, CV lines as *passages*.
-3. **Matching** ([src/core/match.ts](src/core/match.ts)): each requirement's best CV line decides its status (met ≥ 0.65, partial ≥ 0.5, otherwise a gap).
-4. **Named-term check** ([src/core/terms.ts](src/core/terms.ts)): if a requirement names a specific skill (Swedish, Kubernetes, SQL…) that neither the CV nor the portfolio mentions, its status drops one level.
+3. **Matching** ([src/core/match.ts](src/core/match.ts)): each requirement's best CV or portfolio line decides its status (met ≥ 0.65, partial ≥ 0.55, otherwise a gap). The thresholds come from the evaluation below.
+4. **Named-term check** ([src/core/terms.ts](src/core/terms.ts)): if a requirement names a specific skill (Swedish, Kubernetes, SQL…) that neither the CV nor the portfolio mentions, its status drops one level. A requirement's first word counts too, unless it's a common opener ("Experience", "Strong", "Kokemusta"). Finnish case endings and compounds are understood ("Javalla" = Java, "PostgreSQL-tietokannoista" = PostgreSQL). When a requirement offers alternatives ("Python, Java or TypeScript"), one of them is enough.
 5. **Portfolio limits** ([src/core/analyze.ts](src/core/analyze.ts)): at most 50 statements per portfolio page and 150 in total, and embeddings run in batches of 32 ([src/core/batch.ts](src/core/batch.ts)). A blog-sized site once produced 710 statements in one batch and never finished in the browser; with the limits it takes a few seconds.
 
 ## Page fetcher (`POST /api/fetch-page`)
@@ -61,11 +61,24 @@ The first version used embeddings alone, and it rated *"Fluent Swedish is a plus
 
 bge-small separates real matches much better, so it became the model. The language-name confusion remains in both, so a literal check on named terms now handles that case. Embeddings are good at paraphrase and bad at proper nouns, so each technique covers the other's weakness.
 
+## Evaluation (`npm run eval`)
+
+[eval/cases.ts](eval/cases.ts) holds a labelled set: one fictional candidate (CV and portfolio) and 44 requirements in the style of real Finnish job ads, each labelled with the status a careful recruiter would give. Finnish requirements and "X or other Y" phrasing are included. `npm run eval` runs them through the real model and matcher, then sweeps the thresholds. The report is saved to [eval/results.txt](eval/results.txt).
+
+| | Accuracy | English | Finnish | False "met" for a gap |
+|---|---|---|---|---|
+| Before (first word skipped, exact spelling only, partial ≥ 0.5) | 65% | 71% | 20% | 0 |
+| After the named-term fixes | 84% | 87% | 60% | 0 |
+| After the fixes, partial ≥ 0.55 | **86%** | 87% | 80% | 0 |
+
+The biggest gain came from checking a requirement's first word: in requirement lists that's often the skill itself ("Kubernetes in production", "Linux server administration"). The labels are judgement calls and the set is small, so the thresholds were picked from the middle of a flat range, not tuned to single cases. The remaining misses are mostly Finnish text, where an English model is weak.
+
 ## Development
 
 ```bash
 npm install
 npm test        # unit tests (Vitest), using a fake embedder: fast, no model download
+npm run eval    # accuracy on the labelled set with the real model (downloads it once)
 npm run dev     # http://localhost:5173
 npm run build   # static site in dist/ plus api/ functions, deployed on Vercel
 ```
@@ -74,21 +87,23 @@ The core logic was written test-first. Its tests use a deterministic bag-of-word
 
 ## Limits
 
-- English-focused model. Finnish or Swedish ads will match less reliably.
+- English-focused model. Finnish text matches less reliably (80% vs 87% on the evaluation set, from only 5 Finnish cases).
 - The named-term check catches capitalised names and tech tokens (`C++`, `Node.js`), not lowercase skills.
 - Similarity is not proof: the report shows its evidence so a human can judge.
 - Scanned PDFs (images with no text layer) can't be read. The app says so and suggests exporting from Word or Google Docs instead. Old `.doc` files need saving as `.docx` first.
 - Two-column CV layouts may come out with columns interleaved, so the extracted text is shown for checking before analysis.
 - Sites that need a login (e.g. LinkedIn) can't be read. Portfolio text can be pasted into its own field instead.
 - Rendering JavaScript sites adds a few seconds, more on a cold serverless start while Chromium unpacks.
-- The named-term check skips a line's first word, so a requirement like "Ansible or other infrastructure automation" isn't checked for "Ansible". Short tech lists ("Docker, Git and AI tools") also score high against most infrastructure requirements.
+- Short tech lists ("Docker, Git and AI tools") score high against most infrastructure requirements; the named-term check catches the clear cases.
 - Some job sites (e.g. Duunitori) block requests from cloud servers (HTTP 403). The app explains this and asks for the text to be pasted; it doesn't try to get around the block.
 - A text-heavy portfolio adds chance matches: with hundreds of statements, some unrelated line will score 0.6+. Blog metadata lines (dates, tag lists) also end up as statements.
 - Finnish job ads: "what we offer" sections aren't recognised yet (the heading keywords are English, and question-style headings like "Mitä tarjoamme sinulle?" aren't treated as headings).
 
 ## Roadmap
 
-- [ ] Evaluation set with precision and recall per status, run in CI
+- [x] Labelled evaluation set (`npm run eval`)
+- [ ] Multilingual embedding model for Finnish job ads and CVs
+- [ ] Run the evaluation in CI and fail on a drop in accuracy
 - [x] Page fetcher for job ads and portfolios (server side)
 - [x] Link inputs for the job ad and portfolio in the UI, with source tags on evidence
 - [x] Finnish section headings in job ads, and requirement sections from JobPosting data

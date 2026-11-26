@@ -90,6 +90,24 @@ describe("matchRequirements", () => {
     expect(match.missingTerms).toEqual(["Kubernetes", "Swedish"]);
   });
 
+  it("doesn't downgrade when the requirement lists alternatives and one of them is present", async () => {
+    const [match] = await matchRequirements(["Python, Node or Kotlin services"], cv, fakeEmbedder(), {
+      metThreshold: 0.15, // the fake embedder scores these ≈ 0.15–0.2
+      partialThreshold: 0.1,
+    });
+    expect(match.missingTerms).toEqual(["Kotlin"]);
+    expect(match.status).toBe("met");
+  });
+
+  it("downgrades a requirement with alternatives when none of them is present", async () => {
+    const [match] = await matchRequirements(["Led teams building Go or Rust services"], cv, fakeEmbedder(), {
+      metThreshold: 0.15, // the fake embedder scores these ≈ 0.15–0.2
+      partialThreshold: 0.1,
+    });
+    expect(match.missingTerms).toEqual(["Go", "Rust"]);
+    expect(match.status).toBe("partial");
+  });
+
   it("reports no missing terms when the named terms are in the CV", async () => {
     const [match] = await matchRequirements(["Python data pipelines"], cv, fakeEmbedder());
     expect(match.missingTerms).toEqual([]);

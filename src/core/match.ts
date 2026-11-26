@@ -1,13 +1,14 @@
-import { missingTerms } from "./terms";
+import { keyTerms, missingTerms } from "./terms";
 import type { Embedder, MatchOptions, MatchStatus, RequirementMatch, Statement, Summary } from "./types";
 
 /**
- * Defaults tuned for bge-small-en-v1.5 on the evaluation set: real evidence typically
- * scores 0.65+, related-but-different statements 0.5–0.65, unrelated ones below 0.5.
+ * Defaults for bge-small-en-v1.5, checked with `npm run eval` (see eval/results.txt): 0.65 for
+ * met is the best value on the labelled set; for partial, anything from 0.52 to 0.59 scores the
+ * same, so 0.55 sits in the middle of that range rather than on a value tuned to one case.
  */
 export const DEFAULT_OPTIONS: Required<MatchOptions> = {
   metThreshold: 0.65,
-  partialThreshold: 0.5,
+  partialThreshold: 0.55,
   topK: 3,
 };
 
@@ -26,13 +27,24 @@ export function cosineSimilarity(a: number[], b: number[]): number {
 
 const STATUS_RANK: Record<MatchStatus, number> = { gap: 0, partial: 1, met: 2 };
 
+/** "Python, Java or TypeScript", "Docker / Podman", "Javalla tai Pythonilla": any one of the named terms will do. */
+const ALTERNATIVES = /\b(or|tai)\b|\s\/\s/i;
+
 /**
  * Status from the best similarity. Embeddings blur named skills together ("Swedish" ≈ "English"),
- * so a named skill the sources never mention costs one level, however similar the wording.
+ * so a missing named skill costs one level, however similar the wording. When the requirement
+ * offers alternatives, that applies only if none of them is mentioned.
  */
-function classify(score: number, missing: string[], metThreshold: number, partialThreshold: number): MatchStatus {
+function classify(
+  requirement: string,
+  score: number,
+  missing: string[],
+  metThreshold: number,
+  partialThreshold: number,
+): MatchStatus {
   const status: MatchStatus = score >= metThreshold ? "met" : score >= partialThreshold ? "partial" : "gap";
   if (missing.length === 0) return status;
+  if (ALTERNATIVES.test(requirement) && missing.length < keyTerms(requirement).length) return status;
   return status === "met" ? "partial" : "gap";
 }
 
@@ -56,13 +68,13 @@ export async function matchRequirements(
       .sort((a, b) => b.score - a.score);
     const score = ranked[0]?.score ?? 0;
     const missing = missingTerms(requirement, texts);
-    const status = classify(score, missing, metThreshold, partialThreshold);
+    const status = classify(requirement, score, missing, metThreshold, partialThreshold);
     const evidence = status === "gap" ? [] : ranked.filter((e) => e.score >= partialThreshold).slice(0, topK);
 
     // Would the CV on its own earn this status? If not, the other sources are doing the work.
     const cvTexts = statements.filter((s) => s.source.kind === "cv").map((s) => s.text);
     const cvBest = ranked.find((e) => e.source.kind === "cv")?.score ?? 0;
-    const cvStatus = classify(cvBest, missingTerms(requirement, cvTexts), metThreshold, partialThreshold);
+    const cvStatus = classify(requirement, cvBest, missingTerms(requirement, cvTexts), metThreshold, partialThreshold);
     const cvAloneWeaker = STATUS_RANK[cvStatus] < STATUS_RANK[status];
 
     return { requirement, status, score, evidence, missingTerms: missing, cvAloneWeaker };
