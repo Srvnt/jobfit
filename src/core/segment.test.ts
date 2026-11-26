@@ -40,6 +40,11 @@ describe("segment", () => {
     expect(segment(text)).toEqual(["Built ETL pipelines in Python"]);
   });
 
+  it("keeps two-word bullets, common in Finnish, but not two-word plain lines", () => {
+    const text = "Osaaminen\n- Kokemusta PostgreSQL-tietokannoista\n- Python\nHyvät tiimitaidot";
+    expect(segment(text)).toEqual(["Kokemusta PostgreSQL-tietokannoista"]);
+  });
+
   it("removes duplicates, ignoring case and surrounding whitespace", () => {
     const text = "- Strong SQL skills\n-   strong sql skills  \n- Strong SQL skills";
     expect(segment(text)).toEqual(["Strong SQL skills"]);
@@ -99,5 +104,89 @@ describe("segment with line-per-item text (as extracted from PDF and Word files)
 describe("segment with bullet characters used by Word, LibreOffice and PDF exports", () => {
   it.each(["●", "○", "■", "□", "►", "‣", "·", "➢", "✓", "", ""])("strips the %s marker", (marker) => {
     expect(segment(`${marker} Built ETL pipelines in Python`)).toEqual(["Built ETL pipelines in Python"]);
+  });
+});
+
+describe("extractRequirements: requirement sections", () => {
+  it("keeps only the requirement sections when the ad has them", () => {
+    const ad = [
+      "Acme builds analytics software for retailers across the Nordics.",
+      "Who are we?",
+      "We are a team of forty engineers in Helsinki.",
+      "We value curiosity and good coffee.",
+      "Qualifications",
+      "To be successful in this role, we expect that you:",
+      "- Have three years of Python experience",
+      "- Know SQL and data modelling well",
+      "In addition, we consider it an advantage if you have:",
+      "- Experience with Kubernetes in production",
+      "What we offer",
+      "- A hybrid office in central Helsinki",
+    ].join("\n");
+    expect(extractRequirements(ad)).toEqual([
+      "Have three years of Python experience",
+      "Know SQL and data modelling well",
+      "Experience with Kubernetes in production",
+    ]);
+  });
+
+  it("recognises Finnish requirement and non-requirement headings, including questions", () => {
+    const ad = [
+      "Keitä olemme?",
+      "Olemme kasvava ohjelmistotalo Tampereella.",
+      "Mitä odotamme sinulta?",
+      "- Vahvaa osaamista Javasta ja Springistä",
+      "- Kokemusta PostgreSQL-tietokannoista",
+      "Katsomme eduksi:",
+      "- Kokemusta Azuren pilvipalveluista",
+      "Mitä tarjoamme sinulle?",
+      "- Joustavat työajat ja etätyömahdollisuus",
+    ].join("\n");
+    expect(extractRequirements(ad)).toEqual([
+      "Vahvaa osaamista Javasta ja Springistä",
+      "Kokemusta PostgreSQL-tietokannoista",
+      "Kokemusta Azuren pilvipalveluista",
+    ]);
+  });
+
+  it("recognises 'Required' and longer question headings like 'Are you the one we are searching for?'", () => {
+    const ad = [
+      "Why choose us?",
+      "We are a work community of about fifty people.",
+      "Are you the one we are searching for?",
+      "You have several years of backend development experience.",
+      "Required",
+      "Strong SQL and PostgreSQL skills in production",
+      "Considered an advantage",
+      "Docker and Kubernetes experience",
+      "We offer",
+      "Flexible hours and a sauna in the office",
+    ].join("\n");
+    expect(extractRequirements(ad)).toEqual([
+      "You have several years of backend development experience.",
+      "Strong SQL and PostgreSQL skills in production",
+      "Docker and Kubernetes experience",
+    ]);
+  });
+
+  it("ends a requirement section at a prose paragraph that follows its list", () => {
+    const ad = [
+      "Required",
+      "You have several years of backend development experience and enjoy mentoring others.",
+      "Strong SQL and PostgreSQL skills",
+      "Linux server environments",
+      "With your expertise you are part of creating a great customer experience for our industrial clients.",
+      "Ideally you are based near our Tampere office and enjoy a strong office culture.",
+    ].join("\n");
+    expect(extractRequirements(ad)).toEqual([
+      "You have several years of backend development experience and enjoy mentoring others.",
+      "Strong SQL and PostgreSQL skills",
+      "Linux server environments",
+    ]);
+  });
+
+  it("keeps a lead-in line ending in a colon inside the section it belongs to", () => {
+    const ad = "Requirements\n- Five years of backend experience\nTechnical skills:\n- Go and Rust services\nAbout us\n- Founded in 2019 by two engineers";
+    expect(extractRequirements(ad)).toEqual(["Five years of backend experience", "Go and Rust services"]);
   });
 });

@@ -43,6 +43,13 @@ describe("analyze", () => {
       });
     });
 
+    it("accepts pasted portfolio text without an address, labelled as pasted", async () => {
+      const pasted = [{ title: "Pasted", text: "Worked daily in fluent Swedish with bank staff" }];
+      const report = await analyze(jobAd, { cv, portfolio: pasted }, fakeEmbedder(), { partialThreshold: 0.3 });
+      const swedish = report.matches.find((m) => m.requirement === "Fluent Swedish speaker")!;
+      expect(swedish.evidence[0].source).toEqual({ kind: "portfolio", label: "Portfolio (pasted)" });
+    });
+
     it("caps the statements taken from each portfolio page and in total, and reports what was cut", async () => {
       const many = (prefix: string, n: number) =>
         Array.from({ length: n }, (_, i) => `- ${prefix} project number ${i} shipped`).join("\n");

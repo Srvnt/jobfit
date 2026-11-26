@@ -16,6 +16,8 @@ export function App() {
   const [jobAd, setJobAd] = useState("");
   const [cv, setCv] = useState("");
   const [portfolio, setPortfolio] = useState<PortfolioPage[]>([]);
+  // For portfolios the fetcher can't read (JavaScript-only sites): pasted text.
+  const [portfolioText, setPortfolioText] = useState("");
   const [report, setReport] = useState<Report | null>(null);
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
 
@@ -33,7 +35,8 @@ export function App() {
   async function run() {
     setPhase({ kind: "loading", progress: 0 });
     try {
-      setReport(await analyze(jobAd, { cv, portfolio }, embedder));
+      const pasted = portfolioText.trim() ? [{ title: "Pasted portfolio text", text: portfolioText }] : [];
+      setReport(await analyze(jobAd, { cv, portfolio: [...portfolio, ...pasted] }, embedder));
       setPhase({ kind: "idle" });
     } catch (err) {
       setPhase({ kind: "error", message: err instanceof Error ? err.message : String(err) });
@@ -100,11 +103,19 @@ export function App() {
                   <a href={p.url} target="_blank" rel="noreferrer">
                     {p.title || p.url}
                   </a>{" "}
-                  <span className="muted">{new URL(p.url).pathname}</span>
+                  {p.url && <span className="muted">{new URL(p.url).pathname}</span>}
                 </li>
               ))}
             </ul>
           )}
+          <textarea
+            className="short"
+            aria-label="Portfolio text"
+            value={portfolioText}
+            onChange={(e) => setPortfolioText(e.target.value)}
+            placeholder="…or paste text from your portfolio (project descriptions, skills). Useful when the site is built with JavaScript and can't be read from a link."
+            disabled={busy}
+          />
         </div>
       </section>
 
@@ -117,6 +128,7 @@ export function App() {
             setJobAd(SAMPLE_JOB_AD);
             setCv(SAMPLE_CV);
             setPortfolio([]);
+            setPortfolioText("");
           }}
           disabled={busy}
         >

@@ -134,10 +134,14 @@ async function fetchAndExtract(url: string, options: FetchOptions): Promise<Extr
 export async function fetchPages(rawUrl: string, mode: PageMode, options: CrawlOptions): Promise<ExtractedPage[]> {
   const { maxPages } = { ...DEFAULTS, ...options };
   const start = await fetchAndExtract(rawUrl, options);
+  // A job site's structured data holds just the ad: no navigation, "similar jobs" or footer.
+  if (mode === "job" && start.jobPosting) {
+    return [{ ...start, title: start.jobPosting.title || start.title, text: start.jobPosting.text }];
+  }
   if (!start.text) {
     throw new PageError(
       start.clientRendered
-        ? "This site is built with JavaScript and has no readable text without a browser. Paste the text instead."
+        ? "This site is built with JavaScript, so its text can't be read from a link. Paste the text instead."
         : "No readable text was found on that page. Paste the text instead.",
       422,
     );

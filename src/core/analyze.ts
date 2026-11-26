@@ -2,9 +2,9 @@ import { matchRequirements, summarize } from "./match";
 import { extractRequirements, segment } from "./segment";
 import type { Embedder, EvidenceSource, MatchOptions, RequirementMatch, Statement, Summary } from "./types";
 
-/** A fetched page of the candidate's portfolio, already reduced to text. */
+/** A page of the candidate's portfolio, reduced to text: fetched from `url`, or pasted (no url). */
 export interface PortfolioPage {
-  url: string;
+  url?: string;
   title: string;
   text: string;
 }
@@ -39,7 +39,8 @@ export interface Report {
 
 const CV_SOURCE: EvidenceSource = { kind: "cv", label: "CV" };
 
-function portfolioSource(url: string): EvidenceSource {
+function portfolioSource(url: string | undefined): EvidenceSource {
+  if (!url) return { kind: "portfolio", label: "Portfolio (pasted)" };
   const path = new URL(url).pathname.replace(/\/$/, "");
   return { kind: "portfolio", label: path ? `Portfolio: ${path}` : "Portfolio", url };
 }

@@ -112,6 +112,16 @@ describe("fetchPages", () => {
     expect(fetch.requested).toEqual(["https://jobs.example/ad"]);
   });
 
+  it("uses the JobPosting data for a job ad when the page has it", async () => {
+    const data = { "@type": "JobPosting", title: "Data Engineer", description: "<ul><li>Daily Python experience</li></ul>" };
+    const fetch = site({
+      "https://jobs.example/ad": () =>
+        page(`<p>Cookie settings and similar jobs</p><script type="application/ld+json">${JSON.stringify(data)}</script>`, "Ad page"),
+    });
+    const [ad] = await fetchPages("https://jobs.example/ad", "job", { fetch });
+    expect(ad).toMatchObject({ url: "https://jobs.example/ad", title: "Data Engineer", text: "- Daily Python experience" });
+  });
+
   it("for a portfolio, follows same-site links up to the page limit, project-like pages first", async () => {
     const fetch = site({
       "https://alex.example/": () => page(home, "Alex"),

@@ -18,7 +18,7 @@ job ad ──► extractRequirements ──┐                       ┌─► m
 CV ──────► segment ──────────────┘                       └─► named-term check ─► report
 ```
 
-1. **Segmentation** ([src/core/segment.ts](src/core/segment.ts)): splits text into bullets and sentences, handles abbreviations, and drops headings and the non-requirement sections of an ad ("About us", "We offer", "How to apply").
+1. **Segmentation** ([src/core/segment.ts](src/core/segment.ts)): splits text into bullets and sentences and handles abbreviations. For a job ad, when it has requirement headings ("Qualifications", "Required", "Considered an advantage", "Mitä odotamme sinulta?", "Katsomme eduksi"), only those sections are kept. A prose paragraph after a requirement list ends the section. Without such headings, it drops the clearly non-requirement sections ("About us", "We offer", "Mitä tarjoamme?"…). Short lines inside a requirement section count as list items, because job sites' structured data often drops the bullet markers.
 2. **Embedding** ([src/embedder/](src/embedder/)): `bge-small-en-v1.5`, quantised, via Transformers.js. Requirements are embedded as search *queries*, CV lines as *passages*.
 3. **Matching** ([src/core/match.ts](src/core/match.ts)): each requirement's best CV line decides its status (met ≥ 0.65, partial ≥ 0.5, otherwise a gap).
 4. **Named-term check** ([src/core/terms.ts](src/core/terms.ts)): if a requirement names a specific skill (Swedish, Kubernetes, SQL…) that neither the CV nor the portfolio mentions, its status drops one level.
@@ -30,7 +30,7 @@ CV ──────► segment ──────────────┘  
 { "url": "https://alex.example/", "mode": "portfolio" }   →   { "pages": [{ "url", "title", "text" }] }
 ```
 
-`job` mode reads one page. `portfolio` mode reads the start page plus up to four same-site pages, project-like paths first. Pages are reduced to text by [src/web/page.ts](src/web/page.ts), which drops navigation, footers, scripts and cookie banners.
+`job` mode reads one page. When the page has schema.org `JobPosting` data, which job sites publish for search engines, it uses that description, which is just the ad without navigation, "similar jobs" or footers. `portfolio` mode reads the start page plus up to four same-site pages, project-like paths first. Pages are reduced to text by [src/web/page.ts](src/web/page.ts), which drops navigation, footers, scripts and cookie banners.
 
 A server that fetches user-supplied URLs is a classic SSRF risk, so [src/web/safeUrl.ts](src/web/safeUrl.ts) and [src/web/fetchPage.ts](src/web/fetchPage.ts):
 
@@ -73,7 +73,8 @@ The core logic was written test-first. Its tests use a deterministic bag-of-word
 - Similarity is not proof: the report shows its evidence so a human can judge.
 - Scanned PDFs (images with no text layer) can't be read. The app says so and suggests exporting from Word or Google Docs instead. Old `.doc` files need saving as `.docx` first.
 - Two-column CV layouts may come out with columns interleaved, so the extracted text is shown for checking before analysis.
-- The page fetcher can't read sites that only render with JavaScript, or that need a login (e.g. LinkedIn). It says so, and the text can be pasted instead.
+- The page fetcher can't read sites that only render with JavaScript (such as a React portfolio without pre-rendering), or that need a login (e.g. LinkedIn). It says so, and portfolio text can be pasted into its own field instead.
+- The named-term check skips a line's first word, so a requirement like "Ansible or other infrastructure automation" isn't checked for "Ansible". Short tech lists ("Docker, Git and AI tools") also score high against most infrastructure requirements.
 - Some job sites (e.g. Duunitori) block requests from cloud servers (HTTP 403). The app explains this and asks for the text to be pasted; it doesn't try to get around the block.
 - A text-heavy portfolio adds chance matches: with hundreds of statements, some unrelated line will score 0.6+. Blog metadata lines (dates, tag lists) also end up as statements.
 - Finnish job ads: "what we offer" sections aren't recognised yet (the heading keywords are English, and question-style headings like "Mitä tarjoamme sinulle?" aren't treated as headings).
@@ -83,7 +84,7 @@ The core logic was written test-first. Its tests use a deterministic bag-of-word
 - [ ] Evaluation set with precision and recall per status, run in CI
 - [x] Page fetcher for job ads and portfolios (server side)
 - [x] Link inputs for the job ad and portfolio in the UI, with source tags on evidence
-- [ ] Finnish section headings in job ads
+- [x] Finnish section headings in job ads, and requirement sections from JobPosting data
 - [ ] Filter metadata lines (dates, tag lists) out of portfolio pages
 - [ ] Layer 2: in-browser LLM (WebLLM) for a cover-letter draft built only from the matched evidence
 - [ ] Deploy to GitHub Pages

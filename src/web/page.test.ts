@@ -104,3 +104,45 @@ describe("extractPage: links", () => {
     expect(page.links).toEqual(["https://alex.example/projects/jobfit", "https://alex.example/projects/etl"]);
   });
 });
+
+describe("extractPage: schema.org JobPosting", () => {
+  const ld = (data: unknown) => `<script type="application/ld+json">${JSON.stringify(data)}</script>`;
+  const posting = {
+    "@context": "https://schema.org",
+    "@type": "JobPosting",
+    title: "Data Engineer",
+    description: "<p>We build data tools.</p><h3>Requirements</h3><ul><li>Daily Python experience</li><li>Solid SQL skills</li></ul>",
+  };
+  const shell = (head: string) =>
+    html(`<nav><a href="/jobs">All jobs</a></nav><h1>Data Engineer</h1><p>Similar jobs you might like</p>`, head);
+
+  it("reads the job ad from the page's JobPosting data", () => {
+    expect(extractPage(shell(ld(posting)), URL_).jobPosting).toEqual({
+      title: "Data Engineer",
+      text: "We build data tools.\nRequirements\n- Daily Python experience\n- Solid SQL skills",
+    });
+  });
+
+  it("finds a JobPosting inside @graph or with an array @type", () => {
+    const graph = { "@context": "https://schema.org", "@graph": [{ "@type": "WebPage" }, { ...posting, "@type": ["JobPosting"] }] };
+    expect(extractPage(shell(ld(graph)), URL_).jobPosting?.title).toBe("Data Engineer");
+  });
+
+  it("keeps the line breaks of a plain-text description", () => {
+    const plain = { ...posting, description: "We build data tools.\n\nRequirements\nDaily Python experience\n  Solid   SQL skills  " };
+    expect(extractPage(shell(ld(plain)), URL_).jobPosting?.text).toBe(
+      "We build data tools.\nRequirements\nDaily Python experience\nSolid SQL skills",
+    );
+  });
+
+  it("decodes a description whose HTML is entity-escaped", () => {
+    const escaped = { ...posting, description: "&lt;p&gt;Daily Python experience&lt;/p&gt;" };
+    expect(extractPage(shell(ld(escaped)), URL_).jobPosting?.text).toBe("Daily Python experience");
+  });
+
+  it("returns no JobPosting when there is none or the data is malformed", () => {
+    expect(extractPage(shell(""), URL_).jobPosting).toBeUndefined();
+    expect(extractPage(shell('<script type="application/ld+json">{oops</script>'), URL_).jobPosting).toBeUndefined();
+    expect(extractPage(shell(ld({ "@type": "Organization", name: "Acme" })), URL_).jobPosting).toBeUndefined();
+  });
+});

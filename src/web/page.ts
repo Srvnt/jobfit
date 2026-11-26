@@ -14,6 +14,8 @@ export interface ExtractedPage {
   links: string[];
   /** True when the page has no text but loads scripts: a JavaScript app the server can't render. */
   clientRendered: boolean;
+  /** The job ad from the page's schema.org JobPosting data, which job sites publish for search engines. */
+  jobPosting?: { title: string; text: string };
 }
 
 /** Page furniture that never holds the content we want. `<header>` is kept on purpose: portfolios put their intro there. */
@@ -57,6 +59,47 @@ function blockText(root: Element): string {
   return lines.join("\n");
 }
 
+const isJobPosting = (node: unknown): node is { title?: unknown; description?: unknown } => {
+  const type = (node as { "@type"?: unknown })?.["@type"];
+  return type === "JobPosting" || (Array.isArray(type) && type.includes("JobPosting"));
+};
+
+/** Finds a JobPosting in any JSON-LD block, including inside arrays and @graph. */
+function findJobPosting(document: Document): ExtractedPage["jobPosting"] {
+  for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
+    let data: unknown;
+    try {
+      data = JSON.parse(script.textContent ?? "");
+    } catch {
+      continue;
+    }
+    const queue: unknown[] = [data];
+    while (queue.length) {
+      const node = queue.shift();
+      if (Array.isArray(node)) queue.push(...node);
+      else if (isJobPosting(node) && typeof node.description === "string") {
+        let description = node.description;
+        // Some sites entity-escape the HTML inside the JSON ("&lt;p&gt;").
+        if (!/<[a-z]/i.test(description) && /&lt;/i.test(description)) {
+          description = parseHTML(`<html><body>${description}</body></html>`).document.body.textContent ?? "";
+        }
+        // Plain-text descriptions (no tags) carry their structure in line breaks, which HTML parsing would lose.
+        const text = /<[a-z][^>]*>/i.test(description)
+          ? blockText(parseHTML(`<html><body>${description}</body></html>`).document.body)
+          : description
+              .split(/\r?\n/)
+              .map((line) => line.replace(/\s+/g, " ").trim())
+              .filter(Boolean)
+              .join("\n");
+        if (text) return { title: typeof node.title === "string" ? node.title.trim() : "", text };
+      } else if (node && typeof node === "object" && "@graph" in node) {
+        queue.push((node as { "@graph": unknown })["@graph"]);
+      }
+    }
+  }
+  return undefined;
+}
+
 function sameSiteLinks(document: Document, pageUrl: string): string[] {
   const base = new URL(pageUrl);
   base.hash = "";
@@ -82,6 +125,7 @@ export function extractPage(html: string, url: string): ExtractedPage {
   // Browsers add a missing <body> themselves; linkedom doesn't, so wrap bare fragments.
   const { document } = parseHTML(/<body[\s>]/i.test(html) ? html : `<html><body>${html}</body></html>`);
   const links = sameSiteLinks(document, url);
+  const jobPosting = findJobPosting(document);
   const hasScripts = document.querySelector("script[src], script") !== null;
   const title =
     document.querySelector("title")?.textContent?.trim() || document.querySelector("h1")?.textContent?.trim() || "";
@@ -95,5 +139,5 @@ export function extractPage(html: string, url: string): ExtractedPage {
   const mainText = main ? blockText(main) : "";
   const text = mainText || (document.body ? blockText(document.body) : "");
 
-  return { url, title, text, links, clientRendered: text === "" && hasScripts };
+  return { url, title, text, links, clientRendered: text === "" && hasScripts, ...(jobPosting && { jobPosting }) };
 }
