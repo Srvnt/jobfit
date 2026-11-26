@@ -105,7 +105,7 @@ describe("matchRequirements", () => {
         score: 0,
         evidence: [],
         missingTerms: ["Python"],
-        onlyOutsideCv: false,
+        cvAloneWeaker: false,
       },
     ]);
   });
@@ -129,9 +129,22 @@ describe("matchRequirements with several evidence sources", () => {
       fakeEmbedder(),
       { partialThreshold: 0.3 },
     );
-    expect(k8s.onlyOutsideCv).toBe(true);
-    expect(etl.onlyOutsideCv).toBe(false);
+    expect(k8s.cvAloneWeaker).toBe(true);
+    expect(etl.cvAloneWeaker).toBe(false);
     expect(etl.evidence[0].source).toEqual(CV_SOURCE);
+  });
+
+  it("flags a requirement the CV alone would rate lower, even when weaker CV lines are also evidence", async () => {
+    const cvWithTeam = cvStatements(["Led a team of four engineers"]); // shares only "led" and "of": ≈ 0.31
+    const [match] = await matchRequirements(
+      ["Led migration of services to Kubernetes clusters"],
+      [...cvWithTeam, ...portfolio], // the portfolio line scores ≈ 0.53
+      fakeEmbedder(),
+      { metThreshold: 0.5, partialThreshold: 0.3 },
+    );
+    expect(match.status).toBe("met");
+    expect(match.evidence.map((e) => e.source.kind)).toEqual(["portfolio", "cv"]);
+    expect(match.cvAloneWeaker).toBe(true);
   });
 
   it("looks for named terms in every source, not just the CV", async () => {
@@ -147,7 +160,7 @@ describe("summarize", () => {
     score: 0,
     evidence: [],
     missingTerms: [],
-    onlyOutsideCv: false,
+    cvAloneWeaker: false,
   });
 
   it("scores met as 1, partial as 0.5 and gap as 0, as a rounded percentage", () => {

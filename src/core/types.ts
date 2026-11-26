@@ -39,8 +39,8 @@ export interface RequirementMatch {
   evidence: Evidence[];
   /** Named terms in the requirement (e.g. "Kubernetes") that no source mentions. */
   missingTerms: string[];
-  /** Supported, but only by sources other than the CV: worth adding to the CV. */
-  onlyOutsideCv: boolean;
+  /** The CV alone would earn a lower status: the portfolio does the work, so it's worth adding to the CV. */
+  cvAloneWeaker: boolean;
 }
 
 export interface MatchOptions {

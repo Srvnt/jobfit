@@ -156,3 +156,96 @@ describe("fetchPages", () => {
     });
   });
 });
+
+describe("fetchPages with a browser renderer for JavaScript sites", () => {
+  const shell = () => page("<div id='root'></div><script type='module' src='/assets/app.js'></script>", "Alex");
+
+  /** A fake headless browser: returns the "rendered" HTML for known URLs and records calls. */
+  function renderer(pages: Record<string, string>) {
+    const rendered: string[] = [];
+    const render = async (url: string) => {
+      rendered.push(url);
+      const body = pages[url];
+      if (body === undefined) throw new Error("navigation failed");
+      return { url, html: `<html><head><title>Rendered</title></head><body>${body}</body></html>` };
+    };
+    return Object.assign(render, { rendered });
+  }
+
+  it("renders a JavaScript start page in the browser and uses its text", async () => {
+    const fetch = site({ "https://alex.example/": shell });
+    const render = renderer({ "https://alex.example/": "<main><p>Full-stack developer with Java and React.</p></main>" });
+    const pages = await fetchPages("https://alex.example/", "portfolio", { fetch, render });
+    expect(pages.map((p) => p.text)).toEqual(["Full-stack developer with Java and React."]);
+    expect(render.rendered).toEqual(["https://alex.example/"]);
+  });
+
+  it("prefers the browser's own layout-aware text when the renderer provides it", async () => {
+    const fetch = site({ "https://alex.example/": shell });
+    const render = async (url: string) => ({
+      url,
+      html: "<main><span>Petri</span><span>Malmström</span><p>Full-stack developer with Java and React.</p></main>",
+      text: "Petri Malmström\n\n  Full-stack developer   with Java and React.\n",
+    });
+    const [home] = await fetchPages("https://alex.example/", "portfolio", { fetch, render });
+    expect(home.text).toBe("Petri Malmström\nFull-stack developer with Java and React.");
+  });
+
+  it("doesn't start the browser for ordinary pages", async () => {
+    const fetch = site({ "https://alex.example/": () => page("<p>Built ETL pipelines with Airflow.</p>") });
+    const render = renderer({});
+    await fetchPages("https://alex.example/", "portfolio", { fetch, render });
+    expect(render.rendered).toEqual([]);
+  });
+
+  it("reads JobPosting data from a rendered job page", async () => {
+    const data = { "@type": "JobPosting", title: "Java Developer", description: "<ul><li>Java 17 and Spring Boot</li></ul>" };
+    const fetch = site({ "https://jobs.example/ad": shell });
+    const render = renderer({
+      "https://jobs.example/ad": `<p>Apply now!</p><script type="application/ld+json">${JSON.stringify(data)}</script>`,
+    });
+    const [ad] = await fetchPages("https://jobs.example/ad", "job", { fetch, render });
+    expect(ad).toMatchObject({ title: "Java Developer", text: "- Java 17 and Spring Boot" });
+  });
+
+  it("renders JavaScript subpages too, but no more than the render limit", async () => {
+    const links = '<a href="/projects/a">A</a><a href="/projects/b">B</a><a href="/projects/c">C</a>';
+    const fetch = site({
+      "https://alex.example/": shell,
+      "https://alex.example/projects/a": shell,
+      "https://alex.example/projects/b": shell,
+      "https://alex.example/projects/c": shell,
+    });
+    const render = renderer({
+      "https://alex.example/": `<p>Full-stack developer with Java and React.</p>${links}`,
+      "https://alex.example/projects/a": "<p>Built an order service in Spring Boot.</p>",
+      "https://alex.example/projects/b": "<p>Automated deployments with GitHub Actions.</p>",
+      "https://alex.example/projects/c": "<p>Migrated a database to PostgreSQL 16.</p>",
+    });
+    const pages = await fetchPages("https://alex.example/", "portfolio", { fetch, render, maxRenders: 3 });
+    expect(render.rendered).toHaveLength(3);
+    expect(pages.map((p) => p.url)).toEqual([
+      "https://alex.example/",
+      "https://alex.example/projects/a",
+      "https://alex.example/projects/b",
+    ]);
+  });
+
+  it("explains when even the rendered page has no text", async () => {
+    const fetch = site({ "https://alex.example/": shell });
+    const render = renderer({ "https://alex.example/": "<canvas></canvas>" });
+    await expect(fetchPages("https://alex.example/", "portfolio", { fetch, render })).rejects.toMatchObject({
+      status: 422,
+      message: expect.stringMatching(/no readable text.*paste/i),
+    });
+  });
+
+  it("explains when the browser can't load the site", async () => {
+    const fetch = site({ "https://alex.example/": shell });
+    const render = renderer({});
+    await expect(fetchPages("https://alex.example/", "portfolio", { fetch, render })).rejects.toMatchObject({
+      status: 502,
+      message: expect.stringMatching(/couldn't load.*browser.*paste/i),
+    });
+  });
+});

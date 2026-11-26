@@ -12,9 +12,11 @@
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.2",
+    "@sparticuz/chromium": "^158.0.0",
     "linkedom": "^0.18.15",
     "mammoth": "^1.13.0",
     "pdfjs-dist": "^6.5.438",
+    "puppeteer-core": "^25.19.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "undici": "^8.13.1"

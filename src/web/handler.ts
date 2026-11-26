@@ -1,4 +1,4 @@
-import { fetchPages, PageError, type CrawlOptions, type FetchLike, type PageMode } from "./fetchPage.js";
+import { fetchPages, PageError, type CrawlOptions, type FetchLike, type PageMode, type Renderer } from "./fetchPage.js";
 
 /**
  * POST /api/fetch-page  { url, mode: "job" | "portfolio" }
@@ -9,6 +9,8 @@ import { fetchPages, PageError, type CrawlOptions, type FetchLike, type PageMode
 
 export interface HandlerDeps {
   fetch: FetchLike;
+  /** Headless browser for JavaScript-only sites; without it those sites get a "paste the text" message. */
+  render?: Renderer;
   /** Overridable for tests. */
   crawl?: (url: string, mode: PageMode, options: CrawlOptions) => ReturnType<typeof fetchPages>;
 }
@@ -37,7 +39,7 @@ export async function handleFetchPage(request: Request, deps: HandlerDeps): Prom
   if (!MODES.includes(mode as PageMode)) return json(400, { error: 'mode must be "job" or "portfolio".' });
 
   try {
-    const pages = await (deps.crawl ?? fetchPages)(url, mode as PageMode, { fetch: deps.fetch });
+    const pages = await (deps.crawl ?? fetchPages)(url, mode as PageMode, { fetch: deps.fetch, render: deps.render });
     return json(200, { pages: pages.map(({ url, title, text }) => ({ url, title, text })) });
   } catch (err) {
     if (err instanceof PageError) return json(err.status, { error: err.message });

@@ -24,6 +24,18 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   return na === 0 || nb === 0 ? 0 : dot / Math.sqrt(na * nb);
 }
 
+const STATUS_RANK: Record<MatchStatus, number> = { gap: 0, partial: 1, met: 2 };
+
+/**
+ * Status from the best similarity. Embeddings blur named skills together ("Swedish" ≈ "English"),
+ * so a named skill the sources never mention costs one level, however similar the wording.
+ */
+function classify(score: number, missing: string[], metThreshold: number, partialThreshold: number): MatchStatus {
+  const status: MatchStatus = score >= metThreshold ? "met" : score >= partialThreshold ? "partial" : "gap";
+  if (missing.length === 0) return status;
+  return status === "met" ? "partial" : "gap";
+}
+
 /** Matches every requirement against every statement (from the CV or elsewhere) and classifies the result. */
 export async function matchRequirements(
   requirements: string[],
@@ -44,13 +56,16 @@ export async function matchRequirements(
       .sort((a, b) => b.score - a.score);
     const score = ranked[0]?.score ?? 0;
     const missing = missingTerms(requirement, texts);
-    let status: MatchStatus = score >= metThreshold ? "met" : score >= partialThreshold ? "partial" : "gap";
-    // Embeddings blur named skills together ("Swedish" ≈ "English"), so a named skill the CV
-    // never mentions costs one level, however similar the wording.
-    if (missing.length > 0) status = status === "met" ? "partial" : "gap";
+    const status = classify(score, missing, metThreshold, partialThreshold);
     const evidence = status === "gap" ? [] : ranked.filter((e) => e.score >= partialThreshold).slice(0, topK);
-    const onlyOutsideCv = evidence.length > 0 && evidence.every((e) => e.source.kind !== "cv");
-    return { requirement, status, score, evidence, missingTerms: missing, onlyOutsideCv };
+
+    // Would the CV on its own earn this status? If not, the other sources are doing the work.
+    const cvTexts = statements.filter((s) => s.source.kind === "cv").map((s) => s.text);
+    const cvBest = ranked.find((e) => e.source.kind === "cv")?.score ?? 0;
+    const cvStatus = classify(cvBest, missingTerms(requirement, cvTexts), metThreshold, partialThreshold);
+    const cvAloneWeaker = STATUS_RANK[cvStatus] < STATUS_RANK[status];
+
+    return { requirement, status, score, evidence, missingTerms: missing, cvAloneWeaker };
   });
 }
 

@@ -1,6 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
-    "api/fetch-page.ts": { "maxDuration": 30 }
+    "api/fetch-page.ts": {
+      "maxDuration": 60,
+      "memory": 2048,
+      "includeFiles": "node_modules/@sparticuz/chromium/bin/**"
+    }
   }
 }

@@ -35,7 +35,7 @@ describe("analyze", () => {
       const report = await analyze(jobAd, { cv, portfolio: pages }, fakeEmbedder(), { partialThreshold: 0.3 });
       const swedish = report.matches.find((m) => m.requirement === "Fluent Swedish speaker")!;
       expect(swedish.missingTerms).toEqual([]);
-      expect(swedish.onlyOutsideCv).toBe(true);
+      expect(swedish.cvAloneWeaker).toBe(true);
       expect(swedish.evidence[0].source).toEqual({
         kind: "portfolio",
         label: "Portfolio: /projects/sv",

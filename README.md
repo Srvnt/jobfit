@@ -1,6 +1,6 @@
 # JobFit
 
-Give JobFit a job ad (pasted or as a link), your CV (pasted, or as a Word or PDF file) and optionally your portfolio site. It matches every requirement to the lines that back it up, by meaning rather than keywords, shows where each piece of evidence came from, and flags what's missing. When only the portfolio supports a requirement, it suggests adding that to the CV.
+Give JobFit a job ad (pasted or as a link), your CV (pasted, or as a Word or PDF file) and optionally your portfolio site. It matches every requirement to the lines that back it up, by meaning rather than keywords, shows where each piece of evidence came from, and flags what's missing. When the portfolio supports a requirement better than the CV does, it suggests adding that to the CV.
 
 **Live demo:** https://jobfit-cloud.vercel.app/
 
@@ -40,6 +40,12 @@ A server that fetches user-supplied URLs is a classic SSRF risk, so [src/web/saf
 - follow at most 3 redirects, re-checking each one, with an 8 s timeout, a 2 MB size limit and HTML-only content types
 - return user-facing messages only, never internal error details
 
+**JavaScript-only sites** (a React or Vue portfolio without pre-rendering, say) have no text in their HTML. When the fetcher detects one, it renders the page in headless Chromium ([src/web/nodeRender.ts](src/web/nodeRender.ts)): `@sparticuz/chromium` on Vercel, the local Chrome in development (or `CHROME_PATH`). It's the slow path, so it's used only when needed and for at most 3 pages per request.
+
+- Every request the page's own scripts make goes through a request guard ([src/web/requestGuard.ts](src/web/requestGuard.ts)) with the same SSRF rules, including a DNS check per host. Images, fonts and media are skipped.
+- Each render runs in its own browser context, so no cookies or storage carry over between sites.
+- The text comes from the browser's `innerText`, which follows the CSS layout ("<span>Petri</span><span>Malmström</span>" reads as two words). Stylesheets are allowed for that reason.
+
 During `npm run dev`, a small Vite middleware serves the same function, so no Vercel login is needed locally.
 
 ## Why the named-term check exists
@@ -73,7 +79,8 @@ The core logic was written test-first. Its tests use a deterministic bag-of-word
 - Similarity is not proof: the report shows its evidence so a human can judge.
 - Scanned PDFs (images with no text layer) can't be read. The app says so and suggests exporting from Word or Google Docs instead. Old `.doc` files need saving as `.docx` first.
 - Two-column CV layouts may come out with columns interleaved, so the extracted text is shown for checking before analysis.
-- The page fetcher can't read sites that only render with JavaScript (such as a React portfolio without pre-rendering), or that need a login (e.g. LinkedIn). It says so, and portfolio text can be pasted into its own field instead.
+- Sites that need a login (e.g. LinkedIn) can't be read. Portfolio text can be pasted into its own field instead.
+- Rendering JavaScript sites adds a few seconds, more on a cold serverless start while Chromium unpacks.
 - The named-term check skips a line's first word, so a requirement like "Ansible or other infrastructure automation" isn't checked for "Ansible". Short tech lists ("Docker, Git and AI tools") also score high against most infrastructure requirements.
 - Some job sites (e.g. Duunitori) block requests from cloud servers (HTTP 403). The app explains this and asks for the text to be pasted; it doesn't try to get around the block.
 - A text-heavy portfolio adds chance matches: with hundreds of statements, some unrelated line will score 0.6+. Blog metadata lines (dates, tag lists) also end up as statements.

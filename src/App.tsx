@@ -215,8 +215,8 @@ function MatchCard({ match, showSources }: { match: RequirementMatch; showSource
           <strong>{match.missingTerms.join(", ")}</strong>
         </p>
       )}
-      {match.onlyOutsideCv && (
-        <p className="hint small">Only your portfolio shows this. Consider adding it to your CV.</p>
+      {match.cvAloneWeaker && (
+        <p className="hint small">Your portfolio shows this better than your CV does. Consider adding it to your CV.</p>
       )}
       {match.evidence.length > 0 ? (
         <ul className="evidence">

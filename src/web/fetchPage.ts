@@ -15,9 +15,19 @@ export interface FetchOptions {
   maxRedirects?: number;
 }
 
+/**
+ * Loads a page in a headless browser and returns the HTML after its JavaScript has run, plus
+ * optionally the browser's own visible text, which knows how CSS lays elements out into lines.
+ */
+export type Renderer = (url: string) => Promise<{ url: string; html: string; text?: string }>;
+
 export interface CrawlOptions extends FetchOptions {
   /** Portfolio only: the start page plus up to `maxPages - 1` linked pages. */
   maxPages?: number;
+  /** Used only for pages that turn out to be JavaScript apps with no server-rendered text. */
+  render?: Renderer;
+  /** At most this many pages are rendered in the browser per request (it's the slow path). */
+  maxRenders?: number;
 }
 
 export type PageMode = "job" | "portfolio";
@@ -33,7 +43,7 @@ export class PageError extends Error {
   }
 }
 
-const DEFAULTS = { timeoutMs: 8000, maxBytes: 2 * 1024 * 1024, maxRedirects: 3, maxPages: 5 };
+const DEFAULTS = { timeoutMs: 8000, maxBytes: 2 * 1024 * 1024, maxRedirects: 3, maxPages: 5, maxRenders: 3 };
 const HEADERS = { "user-agent": "Mozilla/5.0 (compatible; JobFit/0.1)", accept: "text/html,application/xhtml+xml" };
 /** Portfolio pages most likely to describe work, fetched before other links. */
 const PROJECT_LIKE = /project|projekt|work|case|portfolio|tyot|cv|resume|experience/i;
@@ -127,20 +137,44 @@ async function fetchAndExtract(url: string, options: FetchOptions): Promise<Extr
   return extractPage(html, finalUrl);
 }
 
+type LoadedPage = ExtractedPage & { rendered: boolean };
+
+/** Fetches a page; if it turns out to be a JavaScript app, renders it in the browser (within budget). */
+async function loadPage(url: string, options: CrawlOptions, budget: { renders: number }): Promise<LoadedPage> {
+  const page = await fetchAndExtract(url, options);
+  if (!page.clientRendered || !options.render || budget.renders <= 0) return { ...page, rendered: false };
+  budget.renders--;
+  let result: Awaited<ReturnType<Renderer>>;
+  try {
+    result = await options.render(page.url);
+  } catch (err) {
+    if (err instanceof PageError) throw err;
+    throw new PageError("Couldn't load this site in a browser either. Paste the text instead.", 502);
+  }
+  const extracted = extractPage(result.html, result.url);
+  const text = result.text
+    ?.split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n");
+  return { ...extracted, ...(text && { text }), rendered: true };
+}
+
 /**
  * Fetches a job ad (one page) or a portfolio (the start page plus a few same-site pages,
  * project-like ones first). Linked pages that fail or have no text are skipped.
  */
 export async function fetchPages(rawUrl: string, mode: PageMode, options: CrawlOptions): Promise<ExtractedPage[]> {
-  const { maxPages } = { ...DEFAULTS, ...options };
-  const start = await fetchAndExtract(rawUrl, options);
+  const { maxPages, maxRenders } = { ...DEFAULTS, ...options };
+  const budget = { renders: maxRenders };
+  const start = await loadPage(rawUrl, options, budget);
   // A job site's structured data holds just the ad: no navigation, "similar jobs" or footer.
   if (mode === "job" && start.jobPosting) {
     return [{ ...start, title: start.jobPosting.title || start.title, text: start.jobPosting.text }];
   }
   if (!start.text) {
     throw new PageError(
-      start.clientRendered
+      start.clientRendered && !start.rendered
         ? "This site is built with JavaScript, so its text can't be read from a link. Paste the text instead."
         : "No readable text was found on that page. Paste the text instead.",
       422,
@@ -150,7 +184,7 @@ export async function fetchPages(rawUrl: string, mode: PageMode, options: CrawlO
 
   const isProjectLike = (link: string) => PROJECT_LIKE.test(new URL(link).pathname);
   const ranked = [...start.links.filter(isProjectLike), ...start.links.filter((l) => !isProjectLike(l))];
-  const subpages = await Promise.allSettled(ranked.slice(0, maxPages - 1).map((link) => fetchAndExtract(link, options)));
+  const subpages = await Promise.allSettled(ranked.slice(0, maxPages - 1).map((link) => loadPage(link, options, budget)));
   return [
     start,
     ...subpages.flatMap((r) => (r.status === "fulfilled" && r.value.text ? [r.value] : [])),

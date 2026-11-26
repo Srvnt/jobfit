@@ -53,6 +53,20 @@ describe("handleFetchPage", () => {
     expect((await missing.json()).error).toMatch(/404/);
   });
 
+  it("passes the fetch and render functions on to the crawler", async () => {
+    const render = async (url: string) => ({ url, html: "<p>Rendered text from a JavaScript site.</p>" });
+    let received: unknown;
+    await handleFetchPage(post({ url: "https://jobs.example/ad", mode: "job" }), {
+      fetch,
+      render,
+      crawl: async (_url, _mode, options) => {
+        received = options;
+        return [];
+      },
+    });
+    expect(received).toEqual({ fetch, render });
+  });
+
   it("hides unexpected internal errors behind a generic 500", async () => {
     const response = await handleFetchPage(post({ url: "https://jobs.example/ad", mode: "job" }), {
       fetch,
