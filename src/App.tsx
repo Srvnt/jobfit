@@ -4,6 +4,7 @@ import { batchedEmbedder } from "./core/batch";
 import type { Evidence, MatchStatus, RequirementMatch } from "./core/types";
 import { CvInput } from "./cv/CvInput";
 import { createBrowserEmbedder } from "./embedder/browserEmbedder";
+import { ACTIVE_MODEL } from "./embedder/model";
 import { SAMPLE_CV, SAMPLE_JOB_AD } from "./sample";
 import { LinkFetcher } from "./web/LinkFetcher";
 
@@ -135,7 +136,7 @@ export function App() {
           Try the sample
         </button>
         {phase.kind === "loading" && phase.progress > 0 && phase.progress < 100 && (
-          <span className="muted">Downloading model (one time, ~34 MB): {Math.round(phase.progress)}%</span>
+          <span className="muted">Downloading the AI model (one time, ~{ACTIVE_MODEL.sizeMB} MB): {Math.round(phase.progress)}%</span>
         )}
         {phase.kind === "error" && <span className="error">{phase.message}</span>}
       </div>
@@ -143,8 +144,8 @@ export function App() {
       {report && <Results report={report} />}
 
       <footer className="muted">
-        Model: bge-small-en-v1.5 (quantised) via Transformers.js, plus a literal check for named skills. No API
-        key. Links are read by a small server function; the CV is never uploaded.
+        Model: {ACTIVE_MODEL.id.split("/")[1]} (quantised, English and Finnish) via Transformers.js, plus a literal
+        check for named skills. No API key. Links are read by a small server function; the CV is never uploaded.
       </footer>
     </main>
   );

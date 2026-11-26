@@ -4,7 +4,7 @@ Give JobFit a job ad (pasted or as a link), your CV (pasted, or as a Word or PDF
 
 **Live demo:** https://jobfit-cloud.vercel.app/
 
-**The AI runs in the browser.** The embedding model is downloaded once (~34 MB, then cached) and runs on the visitor's device in a Web Worker. No API key, and the CV never leaves the device.
+**The AI runs in the browser.** A multilingual embedding model (English and Finnish) is downloaded once (~118 MB, then cached) and runs on the visitor's device in a Web Worker. No API key, and the CV never leaves the device.
 
 The only server part is a small page fetcher ([api/fetch-page.ts](api/fetch-page.ts)) for reading a job ad or portfolio from a link, because browsers can't read other sites' pages directly (CORS). Only those public addresses pass through it.
 
@@ -13,15 +13,15 @@ The only server part is a small page fetcher ([api/fetch-page.ts](api/fetch-page
 0. **Reading the CV file** ([src/cv/](src/cv/)): `.docx` files are read with mammoth and PDFs with pdf.js, both in the browser and loaded only when needed. A PDF holds positioned runs of text, not lines, so [layout.ts](src/cv/layout.ts) rebuilds lines and section breaks from their coordinates.
 
 ```
-job ad ──► extractRequirements ──┐                       ┌─► met / partial / gap
-                                 ├─► embed (bge-small) ──► cosine match ─┤
+job ad ──► extractRequirements ──┐                          ┌─► met / partial / gap
+                                 ├─► embed (multilingual) ──► cosine match ─┤
 CV ──────► segment ──────────────┘                       └─► named-term check ─► report
 ```
 
 1. **Segmentation** ([src/core/segment.ts](src/core/segment.ts)): splits text into bullets and sentences and handles abbreviations. For a job ad, when it has requirement headings ("Qualifications", "Required", "Considered an advantage", "Mitä odotamme sinulta?", "Katsomme eduksi"), only those sections are kept. A prose paragraph after a requirement list ends the section. Without such headings, it drops the clearly non-requirement sections ("About us", "We offer", "Mitä tarjoamme?"…). Short lines inside a requirement section count as list items, because job sites' structured data often drops the bullet markers.
-2. **Embedding** ([src/embedder/](src/embedder/)): `bge-small-en-v1.5`, quantised, via Transformers.js. Requirements are embedded as search *queries*, CV lines as *passages*.
-3. **Matching** ([src/core/match.ts](src/core/match.ts)): each requirement's best CV or portfolio line decides its status (met ≥ 0.65, partial ≥ 0.55, otherwise a gap). The thresholds come from the evaluation below.
-4. **Named-term check** ([src/core/terms.ts](src/core/terms.ts)): if a requirement names a specific skill (Swedish, Kubernetes, SQL…) that neither the CV nor the portfolio mentions, its status drops one level. A requirement's first word counts too, unless it's a common opener ("Experience", "Strong", "Kokemusta"). Finnish case endings and compounds are understood ("Javalla" = Java, "PostgreSQL-tietokannoista" = PostgreSQL). When a requirement offers alternatives ("Python, Java or TypeScript"), one of them is enough.
+2. **Embedding** ([src/embedder/](src/embedder/)): `paraphrase-multilingual-MiniLM-L12-v2`, quantised, via Transformers.js, in a Web Worker. It was chosen over `bge-small-en-v1.5` and `multilingual-e5-small` by the evaluation below. The model settings live in [model.ts](src/embedder/model.ts), shared by the browser and the evaluation.
+3. **Matching** ([src/core/match.ts](src/core/match.ts)): each requirement's best CV or portfolio line decides its status (met ≥ 0.43, partial ≥ 0.31, otherwise a gap). Every model scores on its own scale, so the thresholds come from the evaluation too.
+4. **Named-term check** ([src/core/terms.ts](src/core/terms.ts)): if a requirement names a specific skill (Swedish, Kubernetes, SQL…) that neither the CV nor the portfolio mentions, its status drops one level. A requirement's first word counts too, unless it's a common opener ("Experience", "Strong"). In Finnish, where every first word is capitalised, it counts only as the head of a hyphenated compound ("Linux-palvelimien"), since Finnish joins names to compounds with a hyphen. Finnish case endings and compounds are understood ("Javalla" = Java, "PostgreSQL-tietokannoista" = PostgreSQL), and so are language requirements ("ruotsin kielen taito" = Swedish, matching "Swedish" or "ruotsi" in the CV). When a requirement offers alternatives ("Python, Java or TypeScript"), one of them is enough.
 5. **Portfolio limits** ([src/core/analyze.ts](src/core/analyze.ts)): at most 50 statements per portfolio page and 150 in total, and embeddings run in batches of 32 ([src/core/batch.ts](src/core/batch.ts)). A blog-sized site once produced 710 statements in one batch and never finished in the browser; with the limits it takes a few seconds.
 
 ## Page fetcher (`POST /api/fetch-page`)
@@ -63,15 +63,24 @@ bge-small separates real matches much better, so it became the model. The langua
 
 ## Evaluation (`npm run eval`)
 
-[eval/cases.ts](eval/cases.ts) holds a labelled set: one fictional candidate (CV and portfolio) and 44 requirements in the style of real Finnish job ads, each labelled with the status a careful recruiter would give. Finnish requirements and "X or other Y" phrasing are included. `npm run eval` runs them through the real model and matcher, then sweeps the thresholds. The report is saved to [eval/results.txt](eval/results.txt).
+[eval/cases.ts](eval/cases.ts) holds a labelled set: one fictional candidate with an English CV and portfolio, and 60 requirements in the style of real Finnish job ads (21 of them in Finnish), each labelled with the status a careful recruiter would give. `npm run eval` runs every model through the real matcher, sweeps the thresholds for each (models score on different scales), shows how sensitive the result is to the threshold, and saves the report to [eval/results.txt](eval/results.txt).
 
-| | Accuracy | English | Finnish | False "met" for a gap |
-|---|---|---|---|---|
-| Before (first word skipped, exact spelling only, partial ≥ 0.5) | 65% | 71% | 20% | 0 |
-| After the named-term fixes | 84% | 87% | 60% | 0 |
-| After the fixes, partial ≥ 0.55 | **86%** | 87% | 80% | 0 |
+**Model comparison**, each model at its own best thresholds:
 
-The biggest gain came from checking a requirement's first word: in requirement lists that's often the skill itself ("Kubernetes in production", "Linux server administration"). The labels are judgement calls and the set is small, so the thresholds were picked from the middle of a flat range, not tuned to single cases. The remaining misses are mostly Finnish text, where an English model is weak.
+| Model | Download | Accuracy | English | Finnish | False "met" | Met threshold ±0.04 |
+|---|---|---|---|---|---|---|
+| bge-small-en-v1.5 | 34 MB | 77% | 87% | 57% | 0 | 63–75% |
+| multilingual-e5-small | 118 MB | 75% | 82% | 62% | 0 | 47–73% |
+| **paraphrase-multilingual-MiniLM** (used) | 118 MB | **83%** | 85% | **81%** | 0 | 78–80% |
+
+**How the named-term check got here** (with bge-small-en, on the first 44 cases):
+
+| Change | Accuracy | Finnish |
+|---|---|---|
+| Start: first word skipped, exact spelling only | 65% | 20% |
+| Check the first word, Finnish endings, alternatives | 84% | 60% |
+
+The biggest single gain came from checking a requirement's first word: in requirement lists that's often the skill itself ("Kubernetes in production"). Adding Finnish cases then showed that the same rule misfired in Finnish ("**Testivetoinen** kehitys" read as a missing skill), which led to the hyphen-compound rule. The labels are judgement calls and the set is small, so thresholds come from the middle of a flat range rather than being tuned to single cases.
 
 ## Development
 
@@ -87,7 +96,8 @@ The core logic was written test-first. Its tests use a deterministic bag-of-word
 
 ## Limits
 
-- English-focused model. Finnish text matches less reliably (80% vs 87% on the evaluation set, from only 5 Finnish cases).
+- The model handles English and Finnish (85% and 81% on the evaluation set), but its download is ~118 MB the first time.
+- A language missing entirely ("Ruotsin kielen taito" with no Swedish in the CV) shows as partial rather than a gap, because language skills look alike to the model and the named-term check lowers the status by only one level.
 - The named-term check catches capitalised names and tech tokens (`C++`, `Node.js`), not lowercase skills.
 - Similarity is not proof: the report shows its evidence so a human can judge.
 - Scanned PDFs (images with no text layer) can't be read. The app says so and suggests exporting from Word or Google Docs instead. Old `.doc` files need saving as `.docx` first.
@@ -102,7 +112,7 @@ The core logic was written test-first. Its tests use a deterministic bag-of-word
 ## Roadmap
 
 - [x] Labelled evaluation set (`npm run eval`)
-- [ ] Multilingual embedding model for Finnish job ads and CVs
+- [x] Multilingual embedding model for Finnish job ads and CVs
 - [ ] Run the evaluation in CI and fail on a drop in accuracy
 - [x] Page fetcher for job ads and portfolios (server side)
 - [x] Link inputs for the job ad and portfolio in the UI, with source tags on evidence

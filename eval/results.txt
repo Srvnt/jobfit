@@ -1,24 +1,91 @@
+=== model comparison (each at its own best thresholds; small set, so treat differences of 1–2 cases as noise) ===
+bge-small-en                       34 MB   met ≥ 0.65, partial ≥ 0.52    77%   EN  87%   FI  57%   false met 0
+multilingual-e5-small             118 MB   met ≥ 0.84, partial ≥ 0.20    75%   EN  82%   FI  62%   false met 0
+paraphrase-multilingual-minilm    118 MB   met ≥ 0.43, partial ≥ 0.29    83%   EN  85%   FI  81%   false met 0
 
-=== current defaults (met ≥ 0.65, partial ≥ 0.55) ===
-accuracy 86% (38/44)  ·  English 87%  ·  Finnish 80%  ·  false "met" for a gap: 0
+=== bge-small-en at its best thresholds (met ≥ 0.65, partial ≥ 0.52) ===
+accuracy 77% (46/60)  ·  English 87%  ·  Finnish 57%  ·  false "met" for a gap: 0
 expected \ got   met  partial  gap
-met                18        1        1
-partial             0        5        2
-gap                 0        2       15
+met                20        8        1
+partial             0        7        2
+gap                 0        3       19
 misses:
   met     → partial 0.58  Degree in computer science or a related field
-  partial → gap     0.65  Ansible or other infrastructure automation  missing: Ansible
-  partial → gap     0.53  Experience with Jakarta EE or Quarkus  missing: Jakarta, EE, Quarkus
+  partial → gap     0.54  Experience with Jakarta EE or Quarkus  missing: Jakarta, EE, Quarkus
   gap     → partial 0.71  Fluent Swedish  missing: Swedish
-  gap     → partial 0.57  Training machine learning models
-  met     → gap     0.52  Osaamista Azuren pilvipalveluista
+  gap     → partial 0.59  Training machine learning models
+  gap     → partial 0.66  Mobile development with Kotlin  missing: Kotlin
+  met     → partial 0.52  Osaamista Azuren pilvipalveluista
+  met     → partial 0.60  Hyvä SQL-osaaminen
+  met     → partial 0.62  Kokemusta React-käyttöliittymien toteutuksesta
+  met     → partial 0.59  Testivetoinen kehitys (TDD) on sinulle tuttua
+  met     → partial 0.55  Sujuva englannin kielen taito
+  met     → partial 0.60  Kokemusta pilvipalveluista, kuten Azure tai AWS
+  met     → gap     0.51  Kokemusta Dockerista
+  met     → partial 0.60  Infrastruktuuri koodina, esimerkiksi Terraform
+  partial → gap     0.58  Angular-osaaminen  missing: Angular
+  met threshold sensitivity (partial ≥ 0.52): 0.61: 63%, 0.63: 68%, 0.67: 75%, 0.69: 68%
+  next best settings: 0.65/0.53 77%, 0.65/0.20 75%, 0.65/0.21 75%, 0.65/0.22 75%
 
-=== best thresholds on this set (beware of overfitting a small set) ===
-  met ≥ 0.65, partial ≥ 0.52: 86%, false met 0
-  met ≥ 0.65, partial ≥ 0.53: 86%, false met 0
-  met ≥ 0.65, partial ≥ 0.54: 86%, false met 0
-  met ≥ 0.65, partial ≥ 0.55: 86%, false met 0
-  met ≥ 0.65, partial ≥ 0.56: 86%, false met 0
-  met ≥ 0.65, partial ≥ 0.57: 86%, false met 0
-  met ≥ 0.65, partial ≥ 0.58: 86%, false met 0
-  met ≥ 0.65, partial ≥ 0.59: 86%, false met 0
+=== multilingual-e5-small at its best thresholds (met ≥ 0.84, partial ≥ 0.2) ===
+accuracy 75% (45/60)  ·  English 82%  ·  Finnish 62%  ·  false "met" for a gap: 0
+expected \ got   met  partial  gap
+met                22        7        0
+partial             0        6        3
+gap                 0        5       17
+misses:
+  met     → partial 0.83  Containerisation with Docker
+  met     → partial 0.83  Degree in computer science or a related field
+  met     → partial 0.83  Docker or Podman for containers  missing: Podman
+  partial → gap     0.83  PostgreSQL high availability with Patroni  missing: Patroni
+  partial → gap     0.83  Experience with Jakarta EE or Quarkus  missing: Jakarta, EE, Quarkus
+  gap     → partial 0.80  Training machine learning models
+  gap     → partial 0.86  TimescaleDB or other time series databases  missing: TimescaleDB
+  met     → partial 0.83  Vahvaa kokemusta modernista ohjelmistokehityksestä esimerkiksi Pythoni
+  gap     → partial 0.84  Kokemusta Kubernetesista  missing: Kubernetesista
+  met     → partial 0.84  Hyvä SQL-osaaminen
+  met     → partial 0.83  Testivetoinen kehitys (TDD) on sinulle tuttua
+  met     → partial 0.84  Kokemusta Dockerista
+  partial → gap     0.79  Angular-osaaminen  missing: Angular
+  gap     → partial 0.80  Kokemusta koneoppimismallien kouluttamisesta
+  gap     → partial 0.84  Linux-palvelimien ylläpito  missing: Linux
+  met threshold sensitivity (partial ≥ 0.2): 0.80: 62%, 0.82: 73%, 0.86: 62%, 0.88: 47%
+  next best settings: 0.84/0.21 75%, 0.84/0.22 75%, 0.84/0.23 75%, 0.84/0.24 75%
+
+=== paraphrase-multilingual-minilm (active) with the app defaults (met ≥ 0.43, partial ≥ 0.31) ===
+accuracy 83% (50/60)  ·  English 85%  ·  Finnish 81%  ·  false "met" for a gap: 0
+expected \ got   met  partial  gap
+met                28        1        0
+partial             0        5        4
+gap                 0        5       17
+misses:
+  met     → partial 0.39  Experience building user interfaces with React
+  partial → gap     0.35  PostgreSQL high availability with Patroni  missing: Patroni
+  partial → gap     0.35  Experience with Jakarta EE or Quarkus  missing: Jakarta, EE, Quarkus
+  partial → gap     0.28  Frontend development with Angular  missing: Angular
+  gap     → partial 0.60  Fluent Swedish  missing: Swedish
+  gap     → partial 0.50  Industrial IoT experience  missing: IoT
+  gap     → partial 0.65  Ruotsin kielen taito  missing: Swedish
+  partial → gap     0.32  Angular-osaaminen  missing: Angular
+  gap     → partial 0.39  Kokemusta koneoppimismallien kouluttamisesta
+  gap     → partial 0.46  Mobiilisovelluskehitys Kotlinilla  missing: Kotlinilla
+
+=== paraphrase-multilingual-minilm at its best thresholds (met ≥ 0.43, partial ≥ 0.29) ===
+accuracy 83% (50/60)  ·  English 85%  ·  Finnish 81%  ·  false "met" for a gap: 0
+expected \ got   met  partial  gap
+met                28        1        0
+partial             0        5        4
+gap                 0        5       17
+misses:
+  met     → partial 0.39  Experience building user interfaces with React
+  partial → gap     0.35  PostgreSQL high availability with Patroni  missing: Patroni
+  partial → gap     0.35  Experience with Jakarta EE or Quarkus  missing: Jakarta, EE, Quarkus
+  partial → gap     0.28  Frontend development with Angular  missing: Angular
+  gap     → partial 0.60  Fluent Swedish  missing: Swedish
+  gap     → partial 0.50  Industrial IoT experience  missing: IoT
+  gap     → partial 0.65  Ruotsin kielen taito  missing: Swedish
+  partial → gap     0.32  Angular-osaaminen  missing: Angular
+  gap     → partial 0.39  Kokemusta koneoppimismallien kouluttamisesta
+  gap     → partial 0.46  Mobiilisovelluskehitys Kotlinilla  missing: Kotlinilla
+  met threshold sensitivity (partial ≥ 0.29): 0.39: 78%, 0.41: 78%, 0.45: 80%, 0.47: 78%
+  next best settings: 0.43/0.30 83%, 0.43/0.31 83%, 0.43/0.32 83%, 0.43/0.33 83%

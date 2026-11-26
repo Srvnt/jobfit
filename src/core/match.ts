@@ -2,13 +2,14 @@ import { keyTerms, missingTerms } from "./terms";
 import type { Embedder, MatchOptions, MatchStatus, RequirementMatch, Statement, Summary } from "./types";
 
 /**
- * Defaults for bge-small-en-v1.5, checked with `npm run eval` (see eval/results.txt): 0.65 for
- * met is the best value on the labelled set; for partial, anything from 0.52 to 0.59 scores the
- * same, so 0.55 sits in the middle of that range rather than on a value tuned to one case.
+ * Defaults for the active model (paraphrase-multilingual-MiniLM), checked with `npm run eval`
+ * (see eval/results.txt): 0.43 for met is the best value on the labelled set, and accuracy stays
+ * within 5 points for ±0.04. For partial, 0.29–0.33 all score the same, so 0.31 sits in the middle.
+ * Each model scores on its own scale: change these together with ACTIVE_MODEL.
  */
 export const DEFAULT_OPTIONS: Required<MatchOptions> = {
-  metThreshold: 0.65,
-  partialThreshold: 0.55,
+  metThreshold: 0.43,
+  partialThreshold: 0.31,
   topK: 3,
 };
 

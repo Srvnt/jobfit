@@ -18,6 +18,19 @@ describe("keyTerms", () => {
     expect(keyTerms("Training machine learning models")).toEqual([]);
   });
 
+  it("in Finnish, takes a capitalised first word as a name only when it heads a hyphenated compound", () => {
+    expect(keyTerms("Testivetoinen kehitys (TDD) on sinulle tuttua")).toEqual(["TDD"]);
+    expect(keyTerms("Infrastruktuuri koodina, esimerkiksi Terraform")).toEqual(["Terraform"]);
+    expect(keyTerms("Mobiilisovelluskehitys Kotlinilla")).toEqual(["Kotlinilla"]);
+    expect(keyTerms("Angular-osaaminen")).toEqual(["Angular"]);
+    expect(keyTerms("Linux-palvelimien ylläpito")).toEqual(["Linux"]);
+  });
+
+  it("reports the name, not the whole word, for hyphenated compounds", () => {
+    expect(keyTerms("Kokemusta React-käyttöliittymien toteutuksesta")).toEqual(["React"]);
+    expect(keyTerms("Kokemusta Java- ja Spring Boot -kehityksestä")).toEqual(["Java", "Spring", "Boot"]);
+  });
+
   it("returns nothing for a requirement made only of ordinary words", () => {
     expect(keyTerms("Experience building and maintaining data pipelines")).toEqual([]);
   });
@@ -65,5 +78,24 @@ describe("missingTerms with Finnish inflections and compounds", () => {
 
   it("still reports a Finnish-inflected term the CV doesn't have", () => {
     expect(missingTerms("Kokemusta Kubernetesista", cv)).toEqual(["Kubernetesista"]);
+  });
+});
+
+describe("language skills named in Finnish", () => {
+  it("reads 'X kielen taito' as the language, by its English name", () => {
+    expect(keyTerms("Ruotsin kielen taito")).toEqual(["Swedish"]);
+    expect(keyTerms("Sujuva englannin kielen taito")).toEqual(["English"]);
+    expect(keyTerms("Erinomainen suomen kielen taito ja ruotsin kielen alkeet")).toEqual(["Finnish", "Swedish"]);
+  });
+
+  it("doesn't read a place name as a language", () => {
+    expect(keyTerms("Suomen suurin ohjelmistotalo")).toEqual([]);
+  });
+
+  it("matches a language whether the CV names it in English or Finnish", () => {
+    expect(missingTerms("Ruotsin kielen taito", ["Languages: Finnish (native), English (fluent)"])).toEqual(["Swedish"]);
+    expect(missingTerms("Ruotsin kielen taito", ["Kielitaito: suomi, ruotsi, englanti"])).toEqual([]);
+    expect(missingTerms("Fluent Swedish", ["Kielitaito: suomi, ruotsi"])).toEqual([]);
+    expect(missingTerms("Sujuva englannin kielen taito", ["English (fluent)"])).toEqual([]);
   });
 });
