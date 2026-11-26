@@ -25,6 +25,39 @@ describe("analyze", () => {
     await expect(analyze(jobAd, { cv: "" }, fakeEmbedder())).rejects.toThrow(/CV/);
   });
 
+  it("can drop job-ad lines that don't look like requirements, and reports them", async () => {
+    const ad = "- Experience with Python data pipelines\n- We offer flexible hours and lunch benefits\n- Fluent Swedish speaker";
+    const report = await analyze(ad, { cv }, fakeEmbedder(), {
+      partialThreshold: 0.3,
+      lineFilter: {
+        requirementExamples: ["Experience with Python and SQL", "Fluent English speaker"],
+        otherExamples: ["We offer flexible hours and lunch benefits"],
+      },
+    });
+    expect(report.matches.map((m) => m.requirement)).toEqual(["Experience with Python data pipelines", "Fluent Swedish speaker"]);
+    expect(report.ignoredLines).toEqual(["We offer flexible hours and lunch benefits"]);
+  });
+
+  it("trusts requirement headings: the line filter is used only for ads without them", async () => {
+    const ad = "Requirements:\n- Experience with Python data pipelines\n- We offer flexible hours and lunch benefits";
+    const report = await analyze(ad, { cv }, fakeEmbedder(), {
+      lineFilter: {
+        requirementExamples: ["Experience with Python and SQL"],
+        otherExamples: ["We offer flexible hours and lunch benefits"],
+      },
+    });
+    expect(report.matches.map((m) => m.requirement)).toEqual([
+      "Experience with Python data pipelines",
+      "We offer flexible hours and lunch benefits",
+    ]);
+    expect(report.ignoredLines).toEqual([]);
+  });
+
+  it("keeps every requirement line when no line filter is given", async () => {
+    const report = await analyze(jobAd, { cv }, fakeEmbedder());
+    expect(report.ignoredLines).toEqual([]);
+  });
+
   describe("with portfolio pages", () => {
     const pages = [
       { url: "https://alex.example/", title: "Alex Example", text: "Data engineer building retail data platforms in Helsinki\n- Led a small team of engineers" },

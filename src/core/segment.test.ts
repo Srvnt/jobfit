@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractRequirements, segment } from "./segment";
+import { extractRequirements, extractRequirementsDetailed, segment } from "./segment";
 
 describe("segment", () => {
   it("returns an empty list for empty or whitespace input", () => {
@@ -185,8 +185,45 @@ describe("extractRequirements: requirement sections", () => {
     ]);
   });
 
+  it("handles 'meritorious if you have', 'Other information:' and recruitment sections", () => {
+    const ad = [
+      "We are looking for",
+      "- Good practical knowledge of relational databases and SQL",
+      "- Fluent English skills",
+      "It is meritorious if you have",
+      "- Previous experience in the marine industry",
+      "Other information:",
+      "Start: In December or in January",
+      "Location: Preferably Vaasa or Helsinki",
+      "Our recruitment process",
+      "This recruitment process is handled by a staffing partner.",
+    ].join("\n");
+    expect(extractRequirements(ad)).toEqual([
+      "Good practical knowledge of relational databases and SQL",
+      "Fluent English skills",
+      "Previous experience in the marine industry",
+    ]);
+  });
+
+  it("keeps short Finnish list items that contain heading words, when the list has no bullets", () => {
+    const ad = "Odotamme sinulta\nKokemusta Kubernetesista\nHyvä SQL-osaaminen\nSujuva englannin kielen taito\nTarjoamme\nJoustavat työajat";
+    expect(extractRequirements(ad)).toEqual(["Kokemusta Kubernetesista", "Hyvä SQL-osaaminen", "Sujuva englannin kielen taito"]);
+  });
+
+  it("doesn't let a short colon heading that names nothing continue a requirement section", () => {
+    const ad = "Requirements\n- Five years of backend experience\nPractical details:\n- Office in Tampere city centre";
+    expect(extractRequirements(ad)).toEqual(["Five years of backend experience"]);
+  });
+
   it("keeps a lead-in line ending in a colon inside the section it belongs to", () => {
     const ad = "Requirements\n- Five years of backend experience\nTechnical skills:\n- Go and Rust services\nAbout us\n- Founded in 2019 by two engineers";
     expect(extractRequirements(ad)).toEqual(["Five years of backend experience", "Go and Rust services"]);
+  });
+});
+
+describe("extractRequirementsDetailed", () => {
+  it("says whether the requirements came from labelled sections", () => {
+    expect(extractRequirementsDetailed("Requirements\n- Strong SQL skills in production").fromSections).toBe(true);
+    expect(extractRequirementsDetailed("You know SQL well and enjoy testing.").fromSections).toBe(false);
   });
 });

@@ -18,11 +18,14 @@ const ABBREVIATIONS = new Set([
 
 /** Job ad section headings whose content is not a requirement (English and Finnish). */
 const NON_REQUIREMENT_HEADING =
-  /\b(about (us|the company)|who (we are|are we)|we offer|what we offer|benefits|perks|how to apply|contact|salary|compensation)\b|tarjoamme|keitä olemme|keitä me olemme|meistä|yrityksestä|hakeminen|hakuprosessi|näin haet|palkka|\bedut\b|työsuhde-edut|yhteystied|lisätiedot/i;
+  /\b(about (us|the company)|who (we are|are we)|we offer|what we offer|benefits|perks|how to apply|contact|salary|compensation|(other|more|additional) information|practical (details|information)|recruitment|start date|location|employment (period|type))\b|tarjoamme|keitä olemme|keitä me olemme|meistä|yrityksestä|hakeminen|hakuprosessi|näin haet|palkka|\bedut\b|työsuhde-edut|yhteystied|lisätiedot|lisätietoa|rekrytointi|aloitus|sijainti/i;
 
 /** Job ad section headings that introduce requirements (English and Finnish). */
 const REQUIREMENT_HEADING =
-  /require|qualification|searching for|looking for|are you the one|what you('ll)? (bring|have|need)|what we('re| are)? (expect|look(ing)? for)|we expect|you have|you bring|your (profile|skills|background|experience)|skills|must[- ]haves?|nice[- ]to[- ]haves?|advantage|bonus|competenc|vaatimu|odotamme|edellytämme|toivomme|sinulla on|osaami|profiili|eduksi|pätevyy|kokemus/i;
+  /require|qualification|searching for|looking for|are you the one|what you('ll)? (bring|have|need)|what we('re| are)? (expect|look(ing)? for)|we expect|you have|you bring|your (profile|skills|background|experience)|^((technical|key|core|required) )?(skills|competenc\w*)\b|must[- ]haves?|nice[- ]to[- ]haves?|advantage|bonus|merit|preferred|vaatimu|odotamme|edellytämme|toivomme|arvostamme|sinulla on|^(osaaminen|osaamisesi|kokemus|kokemuksesi|profiili|pätevyys)( ja \S+)?:?$|eduksi|pätevyy/i;
+
+/** Longer lines that still introduce a requirement list: "It is meritorious if you have". */
+const REQUIREMENT_LEAD_IN = /^(it is (meritorious|a plus|an advantage)|we (also )?(appreciate|value) (it )?if|katsomme eduksi|eduksi katsotaan|arvostamme)/i;
 
 const wordCount = (s: string) => s.split(/\s+/).filter(Boolean).length;
 
@@ -50,12 +53,16 @@ function isHeading(line: string): boolean {
   const trimmed = line.trim();
   if (trimmed.endsWith(":")) return true;
   if (trimmed.endsWith("?")) return wordCount(trimmed) <= 8; // "Who are we?", "Are you the one we are searching for?"
-  return wordCount(trimmed) <= 4 && !/[.!?]$/.test(trimmed);
+  if (/[.!?]$/.test(trimmed)) return false;
+  return wordCount(trimmed) <= 4 || (wordCount(trimmed) <= 8 && REQUIREMENT_LEAD_IN.test(trimmed));
 }
 
 /** Whether a heading-like line clearly opens a new section rather than being a short list item. */
 const startsNewSection = (line: string) =>
-  /[:?]$/.test(line.trim()) || REQUIREMENT_HEADING.test(line) || NON_REQUIREMENT_HEADING.test(line);
+  /[:?]$/.test(line.trim()) ||
+  REQUIREMENT_HEADING.test(line) ||
+  REQUIREMENT_LEAD_IN.test(line) ||
+  NON_REQUIREMENT_HEADING.test(line);
 
 /** What kind of job-ad section a line sits in; null before the first heading. */
 type SectionKind = "requirement" | "other" | null;
@@ -73,8 +80,11 @@ interface Line {
  */
 function nextSection(current: SectionKind, heading: string): SectionKind {
   if (NON_REQUIREMENT_HEADING.test(heading)) return "other";
-  if (REQUIREMENT_HEADING.test(heading)) return "requirement";
-  return heading.trim().endsWith(":") && current === "requirement" ? "requirement" : "other";
+  if (REQUIREMENT_HEADING.test(heading) || REQUIREMENT_LEAD_IN.test(heading)) return "requirement";
+  // A sentence-like lead-in ("Ideally, you also have:") continues a requirement section; a short
+  // label that names nothing we know ("Practical details:") starts a new one.
+  const leadIn = heading.trim().endsWith(":") && wordCount(heading) >= 5;
+  return leadIn && current === "requirement" ? "requirement" : "other";
 }
 
 /**
@@ -154,10 +164,16 @@ export function segment(text: string): string[] {
  * "We offer", "How to apply" and their Finnish equivalents).
  */
 export function extractRequirements(jobAd: string): string[] {
+  return extractRequirementsDetailed(jobAd).requirements;
+}
+
+/** Like `extractRequirements`, also saying whether the ad's own requirement headings were used. */
+export function extractRequirementsDetailed(jobAd: string): { requirements: string[]; fromSections: boolean } {
   const lines = toLines(jobAd, { jobAd: true });
   // When the ad labels its requirements ("Qualifications", "Mitä odotamme sinulta?"), trust that.
   if (lines.some((l) => l.section === "requirement")) {
-    return toStatements(lines.filter((l) => l.section === "requirement"));
+    return { requirements: toStatements(lines.filter((l) => l.section === "requirement")), fromSections: true };
   }
-  return toStatements(lines.filter((l) => l.heading === null || !NON_REQUIREMENT_HEADING.test(l.heading)));
+  const relevant = lines.filter((l) => l.heading === null || !NON_REQUIREMENT_HEADING.test(l.heading));
+  return { requirements: toStatements(relevant), fromSections: false };
 }

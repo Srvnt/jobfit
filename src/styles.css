@@ -177,3 +177,6 @@ a.source:hover { color: var(--accent); border-color: var(--accent); }
 }
 
 footer { margin-top: 40px; font-size: 0.8rem; }
+.ignored { flex-basis: 100%; color: var(--muted); }
+.ignored summary { cursor: pointer; }
+.ignored ul { margin: 6px 0 0; padding-left: 18px; }

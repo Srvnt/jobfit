@@ -2,6 +2,9 @@ import { writeFileSync } from "node:fs";
 import { it } from "vitest";
 import { DEFAULT_OPTIONS, matchRequirements } from "../src/core/match";
 import { ACTIVE_MODEL, MODELS, type ModelName } from "../src/embedder/model";
+import { filterRequirementLines } from "../src/core/lineFilter";
+import { extractRequirements, extractRequirementsDetailed, segment } from "../src/core/segment";
+import { ADS } from "./ads";
 import type { MatchOptions, MatchStatus, RequirementMatch } from "../src/core/types";
 import { CANDIDATE, CASES, type Case } from "./cases";
 import { nodeEmbedder } from "./nodeEmbedder";
@@ -132,5 +135,47 @@ it("evaluates the matcher on the labelled cases", { timeout: 1_800_000 }, async 
   );
   const text = output.join("\n") + "\n";
   writeFileSync(new URL("./results.txt", import.meta.url), text);
+  console.log(text);
+});
+
+/** Requirement extraction: precision (kept lines that are requirements) and recall (requirements kept). */
+it("evaluates requirement extraction from job ads", { timeout: 600_000 }, async () => {
+  const embedder = nodeEmbedder(ACTIVE_MODEL);
+  const norm = (t: string) => t.replace(/^-\s*/, "").trim().toLowerCase();
+  type Method = (text: string, margin: number) => Promise<string[]>;
+  const methods: Record<string, Method> = {
+    "headings only": async (text) => extractRequirements(text),
+    "AI filter only": async (text, margin) => (await filterRequirementLines(segment(text), embedder, { margin })).kept,
+    "headings + AI filter": async (text, margin) =>
+      (await filterRequirementLines(extractRequirements(text), embedder, { margin })).kept,
+    "headings, AI filter without them (app)": async (text, margin) => {
+      const { requirements, fromSections } = extractRequirementsDetailed(text);
+      return fromSections ? requirements : (await filterRequirementLines(requirements, embedder, { margin })).kept;
+    },
+  };
+
+  const lines: string[] = ["\n=== requirement extraction (" + ADS.length + " labelled ads, " + ACTIVE_MODEL.id + ") ==="];
+  for (const [name, method] of Object.entries(methods)) {
+    for (const margin of name === "headings only" ? [0] : [-0.05, 0, 0.05]) {
+      let kept = 0;
+      let correct = 0;
+      let expected = 0;
+      const wrong: string[] = [];
+      for (const ad of ADS) {
+        const truth = new Set(ad.lines.filter(([, req]) => req).map(([t]) => norm(t)));
+        const got = (await method(ad.lines.map(([t]) => t).join("\n"), margin)).map(norm);
+        expected += truth.size;
+        kept += got.length;
+        correct += got.filter((g) => truth.has(g)).length;
+        wrong.push(...got.filter((g) => !truth.has(g)).map((g) => `kept: ${g}`));
+        wrong.push(...[...truth].filter((t) => !got.includes(t)).map((t) => `missed: ${t}`));
+      }
+      const label = name === "headings only" ? name : `${name} (margin ${margin})`;
+      lines.push(`${label.padEnd(36)} precision ${pct(correct / Math.max(kept, 1))}  recall ${pct(correct / expected)}  (${correct}/${kept} kept, ${expected} expected)`);
+      if (margin === 0) lines.push(...wrong.slice(0, 12).map((w) => `    ${w.slice(0, 90)}`));
+    }
+  }
+  const text = lines.join("\n") + "\n";
+  writeFileSync(new URL("./extraction-results.txt", import.meta.url), text);
   console.log(text);
 });

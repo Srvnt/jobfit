@@ -37,7 +37,7 @@ export function App() {
     setPhase({ kind: "loading", progress: 0 });
     try {
       const pasted = portfolioText.trim() ? [{ title: "Pasted portfolio text", text: portfolioText }] : [];
-      setReport(await analyze(jobAd, { cv, portfolio: [...portfolio, ...pasted] }, embedder));
+      setReport(await analyze(jobAd, { cv, portfolio: [...portfolio, ...pasted] }, embedder, { lineFilter: {} }));
       setPhase({ kind: "idle" });
     } catch (err) {
       setPhase({ kind: "error", message: err instanceof Error ? err.message : String(err) });
@@ -177,6 +177,19 @@ function Results({ report }: { report: Report }) {
           {summary.total} requirements × {statementCount("cv")} CV lines
           {portfolioLines > 0 && ` + ${portfolioLines} portfolio lines`} in {Math.round(report.elapsedMs)} ms
         </span>
+        {report.ignoredLines.length > 0 && (
+          <details className="ignored small">
+            <summary>
+              {report.ignoredLines.length} {report.ignoredLines.length === 1 ? "line" : "lines"} from the ad left out
+              (not requirements)
+            </summary>
+            <ul>
+              {report.ignoredLines.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </details>
+        )}
         {report.portfolioTrimmed && (
           <span className="muted small">
             The portfolio has a lot of text, so only the first part of each page was used.
