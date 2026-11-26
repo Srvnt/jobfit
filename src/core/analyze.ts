@@ -14,11 +14,25 @@ export interface Candidate {
   portfolio?: PortfolioPage[];
 }
 
+/** How many portfolio statements to use: a large site (a blog, say) would otherwise make analysis slow. */
+export interface PortfolioLimits {
+  perPage: number;
+  total: number;
+}
+
+export const DEFAULT_PORTFOLIO_LIMITS: PortfolioLimits = { perPage: 50, total: 150 };
+
+export interface AnalyzeOptions extends MatchOptions {
+  portfolioLimits?: PortfolioLimits;
+}
+
 export interface Report {
   matches: RequirementMatch[];
   summary: Summary;
   /** Every statement matched against, CV first. */
   statements: Statement[];
+  /** True when some portfolio text was left out because of the limits. */
+  portfolioTrimmed: boolean;
   /** Wall-clock time for embedding and matching, in milliseconds. */
   elapsedMs: number;
 }
@@ -30,37 +44,55 @@ function portfolioSource(url: string): EvidenceSource {
   return { kind: "portfolio", label: path ? `Portfolio: ${path}` : "Portfolio", url };
 }
 
-/** CV statements first, then each portfolio page's; a statement seen before (any case) is skipped. */
-function collectStatements(candidate: Candidate): Statement[] {
-  const all: Statement[] = [
-    ...segment(candidate.cv).map((text) => ({ text, source: CV_SOURCE })),
-    ...(candidate.portfolio ?? []).flatMap((page) =>
-      segment(page.text).map((text) => ({ text, source: portfolioSource(page.url) })),
-    ),
-  ];
+/**
+ * CV statements first, then each portfolio page's, within the limits; a statement seen
+ * before (any case) is skipped. The CV is never trimmed.
+ */
+function collectStatements(candidate: Candidate, limits: PortfolioLimits): { statements: Statement[]; trimmed: boolean } {
   const seen = new Set<string>();
-  return all.filter((s) => {
-    const key = s.text.toLowerCase().replace(/\s+/g, " ");
+  const isNew = (text: string) => {
+    const key = text.toLowerCase().replace(/\s+/g, " ");
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
-  });
+  };
+
+  const statements: Statement[] = segment(candidate.cv)
+    .filter(isNew)
+    .map((text) => ({ text, source: CV_SOURCE }));
+  let trimmed = false;
+  let portfolioCount = 0;
+  for (const page of candidate.portfolio ?? []) {
+    const fresh = segment(page.text).filter(isNew);
+    const room = Math.min(limits.perPage, limits.total - portfolioCount);
+    if (fresh.length > room) trimmed = true;
+    const kept = fresh.slice(0, Math.max(0, room));
+    portfolioCount += kept.length;
+    statements.push(...kept.map((text) => ({ text, source: portfolioSource(page.url) })));
+  }
+  return { statements, trimmed };
 }
 
 export async function analyze(
   jobAd: string,
   candidate: Candidate,
   embedder: Embedder,
-  options?: MatchOptions,
+  options: AnalyzeOptions = {},
 ): Promise<Report> {
   const requirements = extractRequirements(jobAd);
   if (requirements.length === 0) throw new Error("No requirements found in the job ad. Try pasting the full ad.");
-  const statements = collectStatements(candidate);
+  const { statements, trimmed } = collectStatements(candidate, options.portfolioLimits ?? DEFAULT_PORTFOLIO_LIMITS);
   if (!statements.some((s) => s.source.kind === "cv")) {
     throw new Error("No statements found in the CV. Try pasting the full CV text.");
   }
 
   const start = performance.now();
   const matches = await matchRequirements(requirements, statements, embedder, options);
-  return { matches, summary: summarize(matches), statements, elapsedMs: performance.now() - start };
+  return {
+    matches,
+    summary: summarize(matches),
+    statements,
+    portfolioTrimmed: trimmed,
+    elapsedMs: performance.now() - start,
+  };
 }

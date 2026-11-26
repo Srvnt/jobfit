@@ -1,6 +1,8 @@
 # JobFit
 
-Paste a job ad and a CV, or upload the CV as a Word (.docx) or PDF file. JobFit matches every requirement to the CV lines that back it up, by meaning rather than keywords, and flags what's missing.
+Give JobFit a job ad (pasted or as a link), your CV (pasted, or as a Word or PDF file) and optionally your portfolio site. It matches every requirement to the lines that back it up, by meaning rather than keywords, shows where each piece of evidence came from, and flags what's missing. When only the portfolio supports a requirement, it suggests adding that to the CV.
+
+**Live demo:** https://jobfit-cloud.vercel.app/
 
 **The AI runs in the browser.** The embedding model is downloaded once (~34 MB, then cached) and runs on the visitor's device in a Web Worker. No API key, and the CV never leaves the device.
 
@@ -19,7 +21,8 @@ CV ──────► segment ──────────────┘  
 1. **Segmentation** ([src/core/segment.ts](src/core/segment.ts)): splits text into bullets and sentences, handles abbreviations, and drops headings and the non-requirement sections of an ad ("About us", "We offer", "How to apply").
 2. **Embedding** ([src/embedder/](src/embedder/)): `bge-small-en-v1.5`, quantised, via Transformers.js. Requirements are embedded as search *queries*, CV lines as *passages*.
 3. **Matching** ([src/core/match.ts](src/core/match.ts)): each requirement's best CV line decides its status (met ≥ 0.65, partial ≥ 0.5, otherwise a gap).
-4. **Named-term check** ([src/core/terms.ts](src/core/terms.ts)): if a requirement names a specific skill (Swedish, Kubernetes, SQL…) that the CV never mentions, its status drops one level.
+4. **Named-term check** ([src/core/terms.ts](src/core/terms.ts)): if a requirement names a specific skill (Swedish, Kubernetes, SQL…) that neither the CV nor the portfolio mentions, its status drops one level.
+5. **Portfolio limits** ([src/core/analyze.ts](src/core/analyze.ts)): at most 50 statements per portfolio page and 150 in total, and embeddings run in batches of 32 ([src/core/batch.ts](src/core/batch.ts)). A blog-sized site once produced 710 statements in one batch and never finished in the browser; with the limits it takes a few seconds.
 
 ## Page fetcher (`POST /api/fetch-page`)
 
@@ -71,13 +74,16 @@ The core logic was written test-first. Its tests use a deterministic bag-of-word
 - Scanned PDFs (images with no text layer) can't be read. The app says so and suggests exporting from Word or Google Docs instead. Old `.doc` files need saving as `.docx` first.
 - Two-column CV layouts may come out with columns interleaved, so the extracted text is shown for checking before analysis.
 - The page fetcher can't read sites that only render with JavaScript, or that need a login (e.g. LinkedIn). It says so, and the text can be pasted instead.
+- Some job sites (e.g. Duunitori) block requests from cloud servers (HTTP 403). The app explains this and asks for the text to be pasted; it doesn't try to get around the block.
+- A text-heavy portfolio adds chance matches: with hundreds of statements, some unrelated line will score 0.6+. Blog metadata lines (dates, tag lists) also end up as statements.
 - Finnish job ads: "what we offer" sections aren't recognised yet (the heading keywords are English, and question-style headings like "Mitä tarjoamme sinulle?" aren't treated as headings).
 
 ## Roadmap
 
 - [ ] Evaluation set with precision and recall per status, run in CI
 - [x] Page fetcher for job ads and portfolios (server side)
-- [ ] Link inputs for the job ad and portfolio in the UI, with source tags on evidence
+- [x] Link inputs for the job ad and portfolio in the UI, with source tags on evidence
 - [ ] Finnish section headings in job ads
+- [ ] Filter metadata lines (dates, tag lists) out of portfolio pages
 - [ ] Layer 2: in-browser LLM (WebLLM) for a cover-letter draft built only from the matched evidence
 - [ ] Deploy to GitHub Pages

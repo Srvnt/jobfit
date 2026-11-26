@@ -105,6 +105,10 @@ export async function fetchHtml(rawUrl: string, options: FetchOptions): Promise<
         url = check(new URL(response.headers.get("location")!, url).href);
         continue;
       }
+      if ([401, 403, 429].includes(response.status)) {
+        // Common on job sites, which often block cloud servers. Don't try to get around it.
+        throw new PageError("This site blocks automated access. Copy the text from the page and paste it instead.", 502);
+      }
       if (!response.ok) throw new PageError(`The website answered with an error (HTTP ${response.status}).`, 502);
 
       const contentType = response.headers.get("content-type") ?? "";

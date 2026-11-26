@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
-import { analyze, type Report } from "./core/analyze";
+import { analyze, type PortfolioPage, type Report } from "./core/analyze";
+import { batchedEmbedder } from "./core/batch";
 import type { Evidence, MatchStatus, RequirementMatch } from "./core/types";
 import { CvInput } from "./cv/CvInput";
 import { createBrowserEmbedder } from "./embedder/browserEmbedder";
 import { SAMPLE_CV, SAMPLE_JOB_AD } from "./sample";
+import { LinkFetcher } from "./web/LinkFetcher";
 
 type Phase = { kind: "idle" } | { kind: "loading"; progress: number } | { kind: "error"; message: string };
 
@@ -13,22 +15,25 @@ const STATUS_ORDER: MatchStatus[] = ["met", "partial", "gap"];
 export function App() {
   const [jobAd, setJobAd] = useState("");
   const [cv, setCv] = useState("");
+  const [portfolio, setPortfolio] = useState<PortfolioPage[]>([]);
   const [report, setReport] = useState<Report | null>(null);
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
 
   // Created once; the model downloads on first use and is cached by the browser afterwards.
   const embedder = useMemo(
     () =>
-      createBrowserEmbedder((file, progress) => {
-        if (file.endsWith(".onnx")) setPhase({ kind: "loading", progress });
-      }),
+      batchedEmbedder(
+        createBrowserEmbedder((file, progress) => {
+          if (file.endsWith(".onnx")) setPhase({ kind: "loading", progress });
+        }),
+      ),
     [],
   );
 
   async function run() {
     setPhase({ kind: "loading", progress: 0 });
     try {
-      setReport(await analyze(jobAd, { cv }, embedder));
+      setReport(await analyze(jobAd, { cv, portfolio }, embedder));
       setPhase({ kind: "idle" });
     } catch (err) {
       setPhase({ kind: "error", message: err instanceof Error ? err.message : String(err) });
@@ -42,8 +47,9 @@ export function App() {
       <header>
         <h1>JobFit</h1>
         <p className="lede">
-          Paste a job ad and a CV, or upload the CV as a Word or PDF file. A small AI model matches every requirement to the CV lines that back it up, by
-          meaning rather than keywords. <strong>It runs entirely in your browser:</strong> nothing you paste or upload leaves your device.
+          Give a job ad and your CV, and optionally your portfolio site. A small AI model matches every requirement to
+          the lines that back it up, by meaning rather than keywords. <strong>The AI runs in your browser:</strong> your
+          CV never leaves your device.
         </p>
       </header>
 
@@ -52,9 +58,54 @@ export function App() {
           <div className="field-head">
             <label htmlFor="job-ad">Job ad</label>
           </div>
-          <textarea id="job-ad" value={jobAd} onChange={(e) => setJobAd(e.target.value)} placeholder="Paste the full job ad…" />
+          <LinkFetcher
+            mode="job"
+            label="Job ad address"
+            placeholder="Link to the job ad, e.g. https://…"
+            disabled={busy}
+            onPages={([page]) => {
+              setJobAd(page.text);
+              return `Fetched "${page.title}". Remove anything below that isn't part of the ad.`;
+            }}
+          />
+          <textarea id="job-ad" value={jobAd} onChange={(e) => setJobAd(e.target.value)} placeholder="…or paste the full job ad" />
         </div>
         <CvInput value={cv} onChange={setCv} disabled={busy} />
+        <div className="field portfolio">
+          <div className="field-head">
+            <span className="label">
+              Portfolio <span className="muted">(optional)</span>
+            </span>
+            {portfolio.length > 0 && (
+              <button type="button" className="link" onClick={() => setPortfolio([])} disabled={busy}>
+                Remove
+              </button>
+            )}
+          </div>
+          <LinkFetcher
+            mode="portfolio"
+            label="Portfolio address"
+            placeholder="Your portfolio site, e.g. yourname.dev"
+            buttonLabel="Add"
+            disabled={busy}
+            onPages={(pages) => {
+              setPortfolio(pages);
+              return `Read ${pages.length} ${pages.length === 1 ? "page" : "pages"}. They're used as extra evidence alongside the CV.`;
+            }}
+          />
+          {portfolio.length > 0 && (
+            <ul className="pages small">
+              {portfolio.map((p) => (
+                <li key={p.url}>
+                  <a href={p.url} target="_blank" rel="noreferrer">
+                    {p.title || p.url}
+                  </a>{" "}
+                  <span className="muted">{new URL(p.url).pathname}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </section>
 
       <div className="actions">
@@ -65,6 +116,7 @@ export function App() {
           onClick={() => {
             setJobAd(SAMPLE_JOB_AD);
             setCv(SAMPLE_CV);
+            setPortfolio([]);
           }}
           disabled={busy}
         >
@@ -79,8 +131,8 @@ export function App() {
       {report && <Results report={report} />}
 
       <footer className="muted">
-        Model: bge-small-en-v1.5 (quantised) via Transformers.js, plus a literal check for named skills. No
-        server, no API key.
+        Model: bge-small-en-v1.5 (quantised) via Transformers.js, plus a literal check for named skills. No API
+        key. Links are read by a small server function; the CV is never uploaded.
       </footer>
     </main>
   );
@@ -112,6 +164,11 @@ function Results({ report }: { report: Report }) {
           {summary.total} requirements × {statementCount("cv")} CV lines
           {portfolioLines > 0 && ` + ${portfolioLines} portfolio lines`} in {Math.round(report.elapsedMs)} ms
         </span>
+        {report.portfolioTrimmed && (
+          <span className="muted small">
+            The portfolio has a lot of text, so only the first part of each page was used.
+          </span>
+        )}
       </div>
 
       <ol className="matches">

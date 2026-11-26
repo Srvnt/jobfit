@@ -43,6 +43,29 @@ describe("analyze", () => {
       });
     });
 
+    it("caps the statements taken from each portfolio page and in total, and reports what was cut", async () => {
+      const many = (prefix: string, n: number) =>
+        Array.from({ length: n }, (_, i) => `- ${prefix} project number ${i} shipped`).join("\n");
+      const big = [
+        { url: "https://alex.example/", title: "Home", text: many("Home", 80) },
+        { url: "https://alex.example/a", title: "A", text: many("Alpha", 10) },
+        { url: "https://alex.example/b", title: "B", text: many("Beta", 80) },
+        { url: "https://alex.example/c", title: "C", text: many("Gamma", 80) },
+      ];
+      const report = await analyze(jobAd, { cv, portfolio: big }, fakeEmbedder(), { portfolioLimits: { perPage: 50, total: 120 } });
+      const perPage = (url: string) => report.statements.filter((s) => s.source.url === url).length;
+      expect([perPage("https://alex.example/"), perPage("https://alex.example/a"), perPage("https://alex.example/b")]).toEqual([
+        50, 10, 50,
+      ]);
+      expect(perPage("https://alex.example/c")).toBe(10); // the total limit of 120 is reached
+      expect(report.portfolioTrimmed).toBe(true);
+    });
+
+    it("does not report trimming when everything fits", async () => {
+      const report = await analyze(jobAd, { cv, portfolio: pages }, fakeEmbedder());
+      expect(report.portfolioTrimmed).toBe(false);
+    });
+
     it("labels the home page as just 'Portfolio' and keeps a statement found in both the CV and portfolio only once, as CV", async () => {
       const report = await analyze(jobAd, { cv, portfolio: pages }, fakeEmbedder());
       expect(report.statements.filter((s) => s.text === "Led a small team of engineers")).toEqual([

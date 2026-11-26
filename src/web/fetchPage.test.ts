@@ -36,7 +36,7 @@ describe("fetchHtml", () => {
 
   it("refuses a redirect to a private address", async () => {
     const fetch = site({ "https://jobs.example/ad": redirect("http://169.254.169.254/latest/meta-data/") });
-    await expect(fetchHtml("https://jobs.example/ad", { fetch })).rejects.toMatchObject({ status: 400, message: /public/i });
+    await expect(fetchHtml("https://jobs.example/ad", { fetch })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/public/i) });
   });
 
   it("gives up after too many redirects", async () => {
@@ -52,7 +52,15 @@ describe("fetchHtml", () => {
 
   it("reports HTTP errors with the status code", async () => {
     const fetch = site({});
-    await expect(fetchHtml("https://jobs.example/gone", { fetch })).rejects.toMatchObject({ status: 502, message: /404/ });
+    await expect(fetchHtml("https://jobs.example/gone", { fetch })).rejects.toMatchObject({ status: 502, message: expect.stringMatching(/404/) });
+  });
+
+  it.each([401, 403, 429])("explains that a site answering %i blocks automated access", async (status) => {
+    const fetch = site({ "https://jobs.example/ad": () => new Response("no", { status, headers: { "content-type": "text/html" } }) });
+    await expect(fetchHtml("https://jobs.example/ad", { fetch })).rejects.toMatchObject({
+      status: 502,
+      message: expect.stringMatching(/blocks automated access.*paste/i),
+    });
   });
 
   it("rejects responses that are not web pages", async () => {
@@ -61,7 +69,7 @@ describe("fetchHtml", () => {
     });
     await expect(fetchHtml("https://jobs.example/cv.pdf", { fetch })).rejects.toMatchObject({
       status: 422,
-      message: /not a web page/i,
+      message: expect.stringMatching(/not a web page/i),
     });
   });
 
@@ -69,7 +77,7 @@ describe("fetchHtml", () => {
     const fetch = site({ "https://jobs.example/huge": () => page("x".repeat(5000)) });
     await expect(fetchHtml("https://jobs.example/huge", { fetch, maxBytes: 1000 })).rejects.toMatchObject({
       status: 422,
-      message: /too large/i,
+      message: expect.stringMatching(/too large/i),
     });
   });
 
@@ -78,7 +86,7 @@ describe("fetchHtml", () => {
       new Promise((_, reject) => init.signal.addEventListener("abort", () => reject(init.signal.reason)));
     await expect(fetchHtml("https://slow.example/", { fetch: slow, timeoutMs: 20 })).rejects.toMatchObject({
       status: 504,
-      message: /too long/i,
+      message: expect.stringMatching(/too long/i),
     });
   });
 
@@ -134,7 +142,7 @@ describe("fetchPages", () => {
     const fetch = site({ "https://spa.example/": () => page("<div id='root'></div><script src='/app.js'></script>") });
     await expect(fetchPages("https://spa.example/", "portfolio", { fetch })).rejects.toMatchObject({
       status: 422,
-      message: /JavaScript/,
+      message: expect.stringMatching(/JavaScript/),
     });
   });
 });
