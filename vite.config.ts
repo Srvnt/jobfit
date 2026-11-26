@@ -6,5 +6,7 @@ export default defineConfig({
   base: "./",
   test: {
     include: ["src/**/*.test.ts"],
+    // Test the same mammoth build the browser gets (the Node build reads files, not ArrayBuffers).
+    alias: { mammoth: "mammoth/mammoth.browser.js" },
   },
 });

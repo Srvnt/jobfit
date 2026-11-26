@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { analyze, type Report } from "./core/analyze";
 import type { MatchStatus, RequirementMatch } from "./core/types";
+import { CvInput } from "./cv/CvInput";
 import { createBrowserEmbedder } from "./embedder/browserEmbedder";
 import { SAMPLE_CV, SAMPLE_JOB_AD } from "./sample";
 
@@ -41,20 +42,19 @@ export function App() {
       <header>
         <h1>JobFit</h1>
         <p className="lede">
-          Paste a job ad and a CV. A small AI model matches every requirement to the CV lines that back it up, by
-          meaning rather than keywords. <strong>It runs entirely in your browser:</strong> nothing you paste leaves your device.
+          Paste a job ad and a CV, or upload the CV as a Word or PDF file. A small AI model matches every requirement to the CV lines that back it up, by
+          meaning rather than keywords. <strong>It runs entirely in your browser:</strong> nothing you paste or upload leaves your device.
         </p>
       </header>
 
       <section className="inputs">
-        <label>
-          <span>Job ad</span>
-          <textarea value={jobAd} onChange={(e) => setJobAd(e.target.value)} placeholder="Paste the full job ad…" />
-        </label>
-        <label>
-          <span>CV</span>
-          <textarea value={cv} onChange={(e) => setCv(e.target.value)} placeholder="Paste your CV as plain text…" />
-        </label>
+        <div className="field">
+          <div className="field-head">
+            <label htmlFor="job-ad">Job ad</label>
+          </div>
+          <textarea id="job-ad" value={jobAd} onChange={(e) => setJobAd(e.target.value)} placeholder="Paste the full job ad…" />
+        </div>
+        <CvInput value={cv} onChange={setCv} disabled={busy} />
       </section>
 
       <div className="actions">

@@ -3,7 +3,7 @@
  * that can each be embedded and compared on their own.
  */
 
-const BULLET = /^\s*(?:[-*•▪◦–]|\d+[.)])\s+/;
+const BULLET = /^\s*(?:[-*•▪◦–●○■□►‣·➢✓\uF0B7\uF0A7]|\d+[.)])\s+/u;
 const MIN_WORDS = 3;
 
 /** Words that end in a period but do not end a sentence. */
@@ -48,32 +48,40 @@ interface Line {
   heading: string | null;
 }
 
-/** Groups the text into logical lines (bullets or paragraphs), tagged with their section heading. */
+/**
+ * Groups the text into logical lines, tagged with their section heading. Every bullet and every
+ * capitalised line starts a new item, since CVs (especially ones extracted from PDF or Word)
+ * often list items one per line without punctuation. A line starting in lowercase continues
+ * the previous item, because it is almost always a wrapped line.
+ */
 function toLines(text: string): Line[] {
   const lines: Line[] = [];
   let heading: string | null = null;
-  let paragraph: string[] = [];
+  let current: Line | null = null;
 
-  const flush = () => {
-    if (paragraph.length) lines.push({ text: paragraph.join(" "), heading });
-    paragraph = [];
+  const close = () => {
+    if (current) lines.push(current);
+    current = null;
   };
 
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line) {
-      flush();
+      close();
     } else if (BULLET.test(line)) {
-      flush();
-      lines.push({ text: line.replace(BULLET, ""), heading });
+      close();
+      current = { text: line.replace(BULLET, ""), heading };
+    } else if (current && /^\p{Ll}/u.test(line)) {
+      current.text += " " + line;
     } else if (isHeading(line)) {
-      flush();
+      close();
       heading = line.replace(/:$/, "");
     } else {
-      paragraph.push(line);
+      close();
+      current = { text: line, heading };
     }
   }
-  flush();
+  close();
   return lines;
 }
 

@@ -80,3 +80,24 @@ describe("extractRequirements", () => {
     ]);
   });
 });
+
+describe("segment with line-per-item text (as extracted from PDF and Word files)", () => {
+  it("treats consecutive capitalised lines without bullets as separate statements", () => {
+    const text = "Developed Python services for retail data\nBuilt ETL pipelines in Airflow";
+    expect(segment(text)).toEqual(["Developed Python services for retail data", "Built ETL pipelines in Airflow"]);
+  });
+
+  it("joins a line that starts in lowercase to the previous one, as a wrapped continuation", () => {
+    const text = "I have five years of experience\nin Python and SQL.\n- Built ETL pipelines with Airflow\n  and dbt on BigQuery";
+    expect(segment(text)).toEqual([
+      "I have five years of experience in Python and SQL.",
+      "Built ETL pipelines with Airflow and dbt on BigQuery",
+    ]);
+  });
+});
+
+describe("segment with bullet characters used by Word, LibreOffice and PDF exports", () => {
+  it.each(["●", "○", "■", "□", "►", "‣", "·", "➢", "✓", "", ""])("strips the %s marker", (marker) => {
+    expect(segment(`${marker} Built ETL pipelines in Python`)).toEqual(["Built ETL pipelines in Python"]);
+  });
+});

@@ -1,10 +1,12 @@
 # JobFit
 
-Paste a job ad and a CV. JobFit matches every requirement to the CV lines that back it up, by meaning rather than keywords, and flags what's missing.
+Paste a job ad and a CV, or upload the CV as a Word (.docx) or PDF file. JobFit matches every requirement to the CV lines that back it up, by meaning rather than keywords, and flags what's missing.
 
 **Everything runs in the browser.** The embedding model is downloaded once (~34 MB, then cached) and runs on the visitor's device in a Web Worker. No server, no API key, no data leaves the device.
 
 ## How it works
+
+0. **Reading the CV file** ([src/cv/](src/cv/)): `.docx` files are read with mammoth and PDFs with pdf.js, both in the browser and loaded only when needed. A PDF holds positioned runs of text, not lines, so [layout.ts](src/cv/layout.ts) rebuilds lines and section breaks from their coordinates.
 
 ```
 job ad ──► extractRequirements ──┐                       ┌─► met / partial / gap
@@ -46,9 +48,12 @@ The core logic was written test-first. Its tests use a deterministic bag-of-word
 - English-focused model. Finnish or Swedish ads will match less reliably.
 - The named-term check catches capitalised names and tech tokens (`C++`, `Node.js`), not lowercase skills.
 - Similarity is not proof: the report shows its evidence so a human can judge.
+- Scanned PDFs (images with no text layer) can't be read. The app says so and suggests exporting from Word or Google Docs instead. Old `.doc` files need saving as `.docx` first.
+- Two-column CV layouts may come out with columns interleaved, so the extracted text is shown for checking before analysis.
 
 ## Roadmap
 
 - [ ] Evaluation set with precision and recall per status, run in CI
+- [ ] Job ad from a link (needs a small serverless fetch function because of CORS)
 - [ ] Layer 2: in-browser LLM (WebLLM) for a cover-letter draft built only from the matched evidence
 - [ ] Deploy to GitHub Pages
